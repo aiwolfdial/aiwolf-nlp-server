@@ -34,9 +34,16 @@ type Server struct {
 	gameLogger          *service.GameLogger
 	realtimeBroadcaster *service.RealtimeBroadcaster
 	ttsBroadcaster      *service.TTSBroadcaster
+	logger              *slog.Logger
 }
 
 func NewServer(config model.Config) (*Server, error) {
+	logger := slog.Default().With(
+		"component", "server",
+		"host", config.Server.WebSocket.Host,
+		"port", config.Server.WebSocket.Port,
+	)
+
 	server := &Server{
 		config: config,
 		upgrader: websocket.Upgrader{
@@ -48,6 +55,7 @@ func NewServer(config model.Config) (*Server, error) {
 		games:       sync.Map{},
 		mu:          sync.RWMutex{},
 		signaled:    false,
+		logger:      logger,
 	}
 	gameSettings, err := model.NewSetting(config)
 	if err != nil {
@@ -113,16 +121,16 @@ func (s *Server) Run() {
 		trap := make(chan os.Signal, 1)
 		signal.Notify(trap, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGINT)
 		sig := <-trap
-		slog.Info("シグナルを受信しました", "signal", sig)
+		s.logger.Info("シグナルを受信しました", "signal", sig)
 		s.signaled = true
 		s.gracefullyShutdown()
 		os.Exit(0)
 	}()
 
-	slog.Info("サーバを起動しました", "host", s.config.Server.WebSocket.Host, "port", s.config.Server.WebSocket.Port)
+	s.logger.Info("サーバを起動しました")
 	err := router.Run(s.config.Server.WebSocket.Host + ":" + strconv.Itoa(s.config.Server.WebSocket.Port))
 	if err != nil {
-		slog.Error("サーバの起動に失敗しました", "error", err)
+		s.logger.Error("サーバの起動に失敗しました", "error", err)
 		return
 	}
 }
@@ -143,45 +151,55 @@ func (s *Server) gracefullyShutdown() {
 		}
 		time.Sleep(15 * time.Second)
 	}
-	slog.Info("全てのゲームが終了しました")
+	s.logger.Info("全てのゲームが終了しました")
 }
 
 func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request) {
 	if s.signaled {
-		slog.Warn("シグナルを受信したため、新しい接続を受け付けません")
+		s.logger.Warn("シグナルを受信したため、新しい接続を受け付けません")
 		return
 	}
+
+	requestLogger := s.logger.With(
+		"method", r.Method,
+		"url", r.URL.String(),
+		"remote_addr", r.RemoteAddr,
+	)
+
 	header := r.Header.Clone()
 	ws, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		slog.Error("クライアントのアップグレードに失敗しました", "error", err)
+		requestLogger.Error("クライアントのアップグレードに失敗しました", "error", err)
 		return
 	}
 	conn, err := model.NewConnection(ws, &header)
 	if err != nil {
-		slog.Error("クライアントの接続に失敗しました", "error", err)
+		requestLogger.Error("クライアントの接続に失敗しました", "error", err)
 		return
 	}
+
+	connLogger := requestLogger.With("team_name", conn.TeamName)
 	if s.config.Server.Authentication.Enable {
 		token := r.URL.Query().Get("token")
 		if token != "" {
 			if !util.IsValidPlayerToken(os.Getenv("SECRET_KEY"), token, conn.TeamName) {
-				slog.Warn("トークンが無効です", "team_name", conn.TeamName)
+				connLogger.Warn("トークンが無効です", "token_source", "query_param")
 				conn.Conn.Close()
-				slog.Info("クライアントの接続を切断しました", "team_name", conn.TeamName)
+				connLogger.Info("クライアントの接続を切断しました")
 				return
 			}
 		} else {
 			token = strings.ReplaceAll(conn.Header.Get("Authorization"), "Bearer ", "")
 			if !util.IsValidPlayerToken(os.Getenv("SECRET_KEY"), token, conn.TeamName) {
-				slog.Warn("トークンが無効です", "team_name", conn.TeamName)
+				connLogger.Warn("トークンが無効です", "token_source", "header")
 				conn.Conn.Close()
-				slog.Info("クライアントの接続を切断しました", "team_name", conn.TeamName)
+				connLogger.Info("クライアントの接続を切断しました")
 				return
 			}
 		}
 	}
 	s.waitingRoom.AddConnection(conn.TeamName, *conn)
+	connLogger.Info("クライアントを待機室に追加しました")
 
 	var game *logic.Game
 	if s.config.Matching.IsOptimize {
@@ -193,14 +211,14 @@ func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request) {
 		matches := s.matchOptimizer.getMatches()
 		roleMapConns, err := s.waitingRoom.GetConnectionsWithMatchOptimizer(matches)
 		if err != nil {
-			slog.Error("待機部屋からの接続の取得に失敗しました", "error", err)
+			connLogger.Error("待機部屋からの接続の取得に失敗しました", "error", err, "match_mode", "optimized")
 			return
 		}
 		game = logic.NewGameWithRole(&s.config, s.gameSetting, roleMapConns)
 	} else {
 		connections, err := s.waitingRoom.GetConnections()
 		if err != nil {
-			slog.Error("待機部屋からの接続の取得に失敗しました", "error", err)
+			connLogger.Error("待機部屋からの接続の取得に失敗しました", "error", err, "match_mode", "standard")
 			return
 		}
 		game = logic.NewGame(&s.config, s.gameSetting, connections)
@@ -219,8 +237,12 @@ func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	s.games.Store(game.ID, game)
 
+	gameLogger := connLogger.With("game_id", game.ID)
+	gameLogger.Info("新しいゲームを開始しました", "player_count", len(game.GetRoleTeamNamesMap()))
+
 	go func() {
 		winSide := game.Start()
+		gameLogger.Info("ゲームが終了しました", "win_side", winSide)
 		if s.config.Matching.IsOptimize {
 			if winSide != model.T_NONE {
 				s.matchOptimizer.setMatchEnd(game.GetRoleTeamNamesMap())
