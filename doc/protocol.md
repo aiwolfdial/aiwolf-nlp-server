@@ -179,9 +179,9 @@
 ゲームの設定を示す情報の構造体.
 
 - agent_count (int): ゲームのプレイヤー数.
+- max_day (int | None): ゲーム内の最大日数. 制限がない場合は None.
 - role_num_map (dict[[Role](#role), int]): 各役職の人数を示すマップ.
 - vote_visibility (bool): 投票の結果を公開するか.
-- talk_on_first_day (bool): 1日目の発言を許可するか.
 - talk.max_count.per_agent (int): 1日あたりの1エージェントの最大発言回数.
 - talk.max_count.per_day (int): 1日あたりの全体の発言回数.
 - talk.max_length.count_in_word (bool | None): 単語数でカウントするか. 設定されない場合は None.
@@ -199,7 +199,9 @@
 - whisper.max_length.base_length (int | None): 1日あたりの1エージェントの最大文字数に含まない最低文字数. 制限がない場合は None.
 - whisper.max_skip (int): 1日あたりの1エージェントの最大スキップ回数.
 - vote.max_count (int): 1位タイの場合の最大再投票回数.
+- vote.allow_self_vote (bool): 自己投票を許可するか.
 - attack_vote.max_count (int): 1位タイの場合の最大襲撃再投票回数.
+- attack_vote.allow_self_vote (bool): 自己投票を許可するか.
 - attack_vote.allow_no_target (bool): 襲撃なしの日を許可するか.
 - timeout.action (int): エージェントのアクションのタイムアウト時間 (ミリ秒).
 - timeout.response (int): エージェントの生存確認のタイムアウト時間 (ミリ秒).

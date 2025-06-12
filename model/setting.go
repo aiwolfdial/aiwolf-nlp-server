@@ -7,9 +7,9 @@ import (
 
 type Setting struct {
 	AgentCount     int          `json:"agent_count"`
+	MaxDay         *int         `json:"max_day,omitempty"`
 	RoleNumMap     map[Role]int `json:"role_num_map"`
 	VoteVisibility bool         `json:"vote_visibility"`
-	TalkOnFirstDay bool         `json:"talk_on_first_day"`
 	Talk           struct {
 		TalkSetting `json:",inline"`
 	} `json:"talk"`
@@ -17,10 +17,12 @@ type Setting struct {
 		TalkSetting `json:",inline"`
 	} `json:"whisper"`
 	Vote struct {
-		MaxCount int `json:"max_count"`
+		MaxCount      int  `json:"max_count"`
+		AllowSelfVote bool `json:"allow_self_vote"`
 	} `json:"vote"`
 	AttackVote struct {
 		MaxCount      int  `json:"max_count"`
+		AllowSelfVote bool `json:"allow_self_vote"`
 		AllowNoTarget bool `json:"allow_no_target"`
 	} `json:"attack_vote"`
 	Timeout struct {
@@ -64,7 +66,6 @@ func NewSetting(config Config) (*Setting, error) {
 		AgentCount:     config.Game.AgentCount,
 		RoleNumMap:     roleNumMap,
 		VoteVisibility: config.Game.VoteVisibility,
-		TalkOnFirstDay: true, // TODO: 削除
 		Talk: struct {
 			TalkSetting `json:",inline"`
 		}{
@@ -108,15 +109,19 @@ func NewSetting(config Config) (*Setting, error) {
 			},
 		},
 		Vote: struct {
-			MaxCount int `json:"max_count"`
+			MaxCount      int  `json:"max_count"`
+			AllowSelfVote bool `json:"allow_self_vote"`
 		}{
-			MaxCount: config.Game.Vote.MaxCount,
+			MaxCount:      config.Game.Vote.MaxCount,
+			AllowSelfVote: config.Game.Vote.AllowSelfVote,
 		},
 		AttackVote: struct {
 			MaxCount      int  `json:"max_count"`
+			AllowSelfVote bool `json:"allow_self_vote"`
 			AllowNoTarget bool `json:"allow_no_target"`
 		}{
 			MaxCount:      config.Game.AttackVote.MaxCount,
+			AllowSelfVote: config.Game.AttackVote.AllowSelfVote,
 			AllowNoTarget: config.Game.AttackVote.AllowNoTarget,
 		},
 		Timeout: struct {
@@ -126,6 +131,9 @@ func NewSetting(config Config) (*Setting, error) {
 			Action:   int(config.Server.Timeout.Action.Milliseconds()),
 			Response: int(config.Server.Timeout.Response.Milliseconds()),
 		},
+	}
+	if config.Game.MaxDay != -1 {
+		setting.MaxDay = &config.Game.MaxDay
 	}
 	if config.Game.Talk.MaxLength.PerTalk != -1 {
 		setting.Talk.MaxLength.CountInWord = &config.Game.Talk.MaxLength.CountInWord

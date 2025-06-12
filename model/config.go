@@ -9,58 +9,48 @@ import (
 )
 
 type Config struct {
-	Server struct {
-		WebSocket struct {
-			Host string `yaml:"host"`
-			Port int    `yaml:"port"`
-		} `yaml:"web_socket"`
-		Authentication struct {
-			Enable bool `yaml:"enable"`
-		} `yaml:"authentication"`
-		Timeout struct {
-			Action     time.Duration `yaml:"action"`
-			Response   time.Duration `yaml:"response"`
-			Acceptable time.Duration `yaml:"acceptable"`
-		} `yaml:"timeout"`
-		MaxContinueErrorRatio float64 `yaml:"max_continue_error_ratio"`
-	} `yaml:"server"`
-	Game struct {
-		AgentCount     int        `yaml:"agent_count"`
-		MaxDay         int        `yaml:"max_day"`
-		VoteVisibility bool       `yaml:"vote_visibility"`
-		Talk           TalkConfig `yaml:"talk"`
-		Whisper        TalkConfig `yaml:"whisper"`
-		Vote           struct {
-			MaxCount int `yaml:"max_count"`
-		} `yaml:"vote"`
-		AttackVote struct {
-			MaxCount      int  `yaml:"max_count"`
-			AllowNoTarget bool `yaml:"allow_no_target"`
-		} `yaml:"attack_vote"`
-	} `yaml:"game"`
-	Logic    LogicConfig `yaml:"logic"`
-	Matching struct {
-		SelfMatch    bool   `yaml:"self_match"`
-		IsOptimize   bool   `yaml:"is_optimize"`
-		TeamCount    int    `yaml:"team_count"`
-		GameCount    int    `yaml:"game_count"`
-		OutputPath   string `yaml:"output_path"`
-		InfiniteLoop bool   `yaml:"infinite_loop"`
-	} `yaml:"matching"`
-	CustomProfile struct {
-		Enable         bool      `yaml:"enable"`
-		Profiles       []Profile `yaml:"profiles"`
-		DynamicProfile struct {
-			Enable   bool     `yaml:"enable"`
-			Prompt   string   `yaml:"prompt"`
-			Attempts int      `yaml:"attempts"`
-			Avatars  []string `yaml:"avatars"`
-		} `yaml:"dynamic_profile"`
-	} `yaml:"custom_profile"`
+	Server              ServerConfig              `yaml:"server"`
+	Game                GameConfig                `yaml:"game"`
+	Logic               LogicConfig               `yaml:"logic"`
+	Matching            MatchingConfig            `yaml:"matching"`
+	CustomProfile       CustomProfileConfig       `yaml:"custom_profile"`
 	JSONLogger          JSONLoggerConfig          `yaml:"json_logger"`
 	GameLogger          GameLoggerConfig          `yaml:"game_logger"`
 	RealtimeBroadcaster RealtimeBroadcasterConfig `yaml:"realtime_broadcaster"`
 	TTSBroadcaster      TTSBroadcasterConfig      `yaml:"tts_broadcaster"`
+}
+
+type ServerConfig struct {
+	WebSocket struct {
+		Host string `yaml:"host"`
+		Port int    `yaml:"port"`
+	} `yaml:"web_socket"`
+	Authentication struct {
+		Enable bool `yaml:"enable"`
+	} `yaml:"authentication"`
+	Timeout struct {
+		Action     time.Duration `yaml:"action"`
+		Response   time.Duration `yaml:"response"`
+		Acceptable time.Duration `yaml:"acceptable"`
+	} `yaml:"timeout"`
+	MaxContinueErrorRatio float64 `yaml:"max_continue_error_ratio"`
+}
+
+type GameConfig struct {
+	AgentCount     int        `yaml:"agent_count"`
+	MaxDay         int        `yaml:"max_day"`
+	VoteVisibility bool       `yaml:"vote_visibility"`
+	Talk           TalkConfig `yaml:"talk"`
+	Whisper        TalkConfig `yaml:"whisper"`
+	Vote           struct {
+		MaxCount      int  `yaml:"max_count"`
+		AllowSelfVote bool `yaml:"allow_self_vote"`
+	} `yaml:"vote"`
+	AttackVote struct {
+		MaxCount      int  `yaml:"max_count"`
+		AllowSelfVote bool `yaml:"allow_self_vote"`
+		AllowNoTarget bool `yaml:"allow_no_target"`
+	} `yaml:"attack_vote"`
 }
 
 type TalkConfig struct {
@@ -88,6 +78,26 @@ type Phase struct {
 	Actions   []string `yaml:"actions"`
 	OnlyDay   *int     `yaml:"only_day,omitempty"`
 	ExceptDay *int     `yaml:"except_day,omitempty"`
+}
+
+type MatchingConfig struct {
+	SelfMatch    bool   `yaml:"self_match"`
+	IsOptimize   bool   `yaml:"is_optimize"`
+	TeamCount    int    `yaml:"team_count"`
+	GameCount    int    `yaml:"game_count"`
+	OutputPath   string `yaml:"output_path"`
+	InfiniteLoop bool   `yaml:"infinite_loop"`
+}
+
+type CustomProfileConfig struct {
+	Enable         bool      `yaml:"enable"`
+	Profiles       []Profile `yaml:"profiles"`
+	DynamicProfile struct {
+		Enable   bool     `yaml:"enable"`
+		Prompt   string   `yaml:"prompt"`
+		Attempts int      `yaml:"attempts"`
+		Avatars  []string `yaml:"avatars"`
+	} `yaml:"dynamic_profile"`
 }
 
 type Profile struct {

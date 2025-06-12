@@ -59,10 +59,12 @@
 ### vote (追放フェーズの設定)
 
 - `max_count`: 1位タイの場合の最大再投票回数
+- `allow_self_vote`: 自己投票を許可するか
 
 ### attack_vote (襲撃フェーズの設定)
 
 - `max_count`: 1位タイの場合の最大再投票回数
+- `allow_self_vote`: 自己投票を許可するか
 - `allow_no_target`: 襲撃なしの日を許可するか
 
 ## logic (ロジックの設定)

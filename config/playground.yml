@@ -40,8 +40,10 @@ game:
     max_skip: 0
   vote:
     max_count: 1
+    allow_self_vote: true
   attack_vote:
     max_count: 1
+    allow_self_vote: true
     allow_no_target: false
 
 logic:

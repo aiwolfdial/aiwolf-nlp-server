@@ -31,6 +31,12 @@ func (g *Game) collectVotes(request model.Request, agents []*model.Agent) []mode
 			slog.Warn("投票対象が死亡しているため、投票を無視します", "id", g.ID, "agent", agent.String(), "target", target.String())
 			continue
 		}
+		if (request == model.R_VOTE && !g.config.Game.Vote.AllowSelfVote) || (request == model.R_ATTACK && !g.config.Game.AttackVote.AllowSelfVote) {
+			if agent.Idx == target.Idx {
+				slog.Warn("自己投票は許可されていないため、投票を無視します", "id", g.ID, "agent", agent.String(), "target", target.String())
+				continue
+			}
+		}
 		votes = append(votes, model.Vote{
 			Day:    g.getCurrentGameStatus().Day,
 			Agent:  *agent,
@@ -62,4 +68,5 @@ func (g *Game) collectVotes(request model.Request, agents []*model.Agent) []mode
 		slog.Info("投票を受信しました", "id", g.ID, "agent", agent.String(), "target", target.String())
 	}
 	return votes
+
 }
