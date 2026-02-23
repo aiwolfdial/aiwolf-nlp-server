@@ -16,7 +16,7 @@ server:
 game:
   agent_count: 13
   max_day: -1
-  vote_visibility: false
+  vote_visibility: true
   talk:
     max_count:
       per_agent: 4
