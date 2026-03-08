@@ -38,6 +38,17 @@ For more detailed implementation, please refer to [role.go](../model/role.go).
 | VILLAGER  | 2      |
 | MEDIUM    | 0      |
 
+#### 9-Player Game
+
+| Role      | Number |
+| --------- | ------ |
+| WEREWOLF  | 2      |
+| POSSESSED | 1      |
+| SEER      | 1      |
+| BODYGUARD | 1      |
+| VILLAGER  | 3      |
+| MEDIUM    | 1      |
+
 #### 13-Player Game
 
 | Role      | Number |

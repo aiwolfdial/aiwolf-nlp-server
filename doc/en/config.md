@@ -33,7 +33,7 @@
 ## game (Game Settings)
 
 - `agent_count`: The number of agents per game.
-  For a 5-player game, set it to `5`, and for a 13-player game, set it to `13`.
+  For a 5-player game, set it to `5`, for a 9-player game, set it to `9`, and for a 13-player game, set it to `13`.
 - `max_day`: The maximum number of days in the game. If there is no limit, set it to `-1`.
 - `vote_visibility`: Whether to reveal the results of votes.
 
