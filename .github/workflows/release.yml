@@ -30,8 +30,10 @@ jobs:
             dist/aiwolf-nlp-server-darwin-amd64
             dist/aiwolf-nlp-server-darwin-arm64
             config/default_5.yml
+            config/default_9.yml
             config/default_13.yml
             config/default_en_5.yml
+            config/default_en_9.yml
             config/default_en_13.yml
             config/example.env
         env:
