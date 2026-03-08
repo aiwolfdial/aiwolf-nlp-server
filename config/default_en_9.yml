@@ -20,7 +20,7 @@ game:
   talk:
     max_count:
       per_agent: 4
-      per_day: 52
+      per_day: 36
     max_length:
       count_in_word: false
       count_spaces: false
@@ -32,7 +32,7 @@ game:
   whisper:
     max_count:
       per_agent: 4
-      per_day: 12
+      per_day: 8
     max_length:
       count_in_word: false
       count_spaces: false
