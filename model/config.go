@@ -54,6 +54,8 @@ type GameConfig struct {
 }
 
 type TalkConfig struct {
+	Mode      string `yaml:"mode"`
+	TimeLimit int    `yaml:"time_limit"`
 	MaxCount struct {
 		PerAgent int `yaml:"per_agent"`
 		PerDay   int `yaml:"per_day"`
