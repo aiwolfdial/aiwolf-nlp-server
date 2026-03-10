@@ -291,7 +291,7 @@ realtime_broadcaster:
   filename: "{timestamp}_{teams}"
 
 tts_broadcaster:
-  enable: false
+  enable: true
   async: false
   target_duration: 1s
   segment_dir: ./cache/segment
