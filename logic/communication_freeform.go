@@ -46,9 +46,9 @@ func (s *CommunicationSession) runFreeform() {
 		turnMap[*agent] = 0
 	}
 
-	done := make(chan bool)
-
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			select {
 			case submission := <-talkChannel:
@@ -65,13 +65,12 @@ func (s *CommunicationSession) runFreeform() {
 				mu.Unlock()
 
 			case <-ctx.Done():
-				done <- true
 				return
 			}
 		}
 	}()
 
-	<-done
+	wg.Wait()
 	slog.Info("グループチャット方式の通信を終了します", "id", s.game.id, "totalTalks", s.idx)
 
 	phaseEndPacket := model.Packet{
