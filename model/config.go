@@ -54,6 +54,7 @@ type GameConfig struct {
 }
 
 type TalkConfig struct {
+	Duration *time.Duration `yaml:"duration,omitempty"`
 	MaxCount struct {
 		PerAgent int `yaml:"per_agent"`
 		PerDay   int `yaml:"per_day"`

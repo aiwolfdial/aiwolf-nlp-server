@@ -42,6 +42,24 @@ var (
 	R_FINISH = Request{
 		Type:            "FINISH",
 		RequireResponse: false}
+	R_TALK_PHASE_START = Request{
+		Type:            "TALK_PHASE_START",
+		RequireResponse: false}
+	R_TALK_PHASE_END = Request{
+		Type:            "TALK_PHASE_END",
+		RequireResponse: false}
+	R_TALK_BROADCAST = Request{
+		Type:            "TALK_BROADCAST",
+		RequireResponse: false}
+	R_WHISPER_PHASE_START = Request{
+		Type:            "WHISPER_PHASE_START",
+		RequireResponse: false}
+	R_WHISPER_PHASE_END = Request{
+		Type:            "WHISPER_PHASE_END",
+		RequireResponse: false}
+	R_WHISPER_BROADCAST = Request{
+		Type:            "WHISPER_BROADCAST",
+		RequireResponse: false}
 )
 
 func (r Request) String() string {
@@ -76,6 +94,18 @@ func RequestFromString(s string) Request {
 		return R_DAILY_FINISH
 	case "FINISH":
 		return R_FINISH
+	case "TALK_PHASE_START":
+		return R_TALK_PHASE_START
+	case "TALK_PHASE_END":
+		return R_TALK_PHASE_END
+	case "TALK_BROADCAST":
+		return R_TALK_BROADCAST
+	case "WHISPER_PHASE_START":
+		return R_WHISPER_PHASE_START
+	case "WHISPER_PHASE_END":
+		return R_WHISPER_PHASE_END
+	case "WHISPER_BROADCAST":
+		return R_WHISPER_BROADCAST
 	}
 	return Request{}
 }

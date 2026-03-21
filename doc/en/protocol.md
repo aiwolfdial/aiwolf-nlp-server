@@ -25,6 +25,12 @@ In this document, messages sent from the server to the agents are referred to as
 - [Vote Request](#vote-request-vote) `VOTE`
 - [Attack Request](#attack-request-attack) `ATTACK`
 - [Game End Request](#game-end-request-finish) `FINISH`
+- [Talk Phase Start Request](#talk-phase-start-request-talk_phase_start) `TALK_PHASE_START` (Group Chat mode only)
+- [Talk Phase End Request](#talk-phase-end-request-talk_phase_end) `TALK_PHASE_END` (Group Chat mode only)
+- [Talk Broadcast Request](#talk-broadcast-request-talk_broadcast) `TALK_BROADCAST` (Group Chat mode only)
+- [Whisper Phase Start Request](#whisper-phase-start-request-whisper_phase_start) `WHISPER_PHASE_START` (Group Chat mode only)
+- [Whisper Phase End Request](#whisper-phase-end-request-whisper_phase_end) `WHISPER_PHASE_END` (Group Chat mode only)
+- [Whisper Broadcast Request](#whisper-broadcast-request-whisper_broadcast) `WHISPER_BROADCAST` (Group Chat mode only)
 
 Depending on the type of request, the information contained in the request and whether a response is required differs.\
 For detailed implementation, refer to [request.go](../model/request.go) and [packet.go](../model/packet.go).
@@ -42,6 +48,8 @@ Packet structure.
 - setting ([Setting](#setting) | None): Game setting information.
 - talk_history (list[[Talk](#talk)] | None): History of talks.
 - whisper_history (list[[Talk](#talk)] | None): History of whispers.
+- new_talk ([Talk](#talk) | None): Newly broadcast talk in group chat mode. (Only for `TALK_BROADCAST` requests).
+- new_whisper ([Talk](#talk) | None): Newly broadcast whisper in group chat mode. (Only for `WHISPER_BROADCAST` requests).
 
 ### Request
 
@@ -113,6 +121,40 @@ The Game End Request is sent when the game ends.\
 The agent does not need to return anything upon receiving this request.\
 The keys for this request are the same as the Game Start Request, except that [Setting](#setting) is not sent.\
 Unlike the Game Start Request, the [Info](#info) contains the role_map, which includes the roles of all agents, including those other than the agent.
+
+#### Talk Phase Start Request (TALK_PHASE_START)
+
+Sent when the talk phase starts in group chat mode.\
+The agent does not need to return anything upon receiving this request.\
+After receiving this request, the agent can freely send talks without waiting for requests from the server.
+
+#### Talk Phase End Request (TALK_PHASE_END)
+
+Sent when the talk phase ends in group chat mode.\
+The agent does not need to return anything upon receiving this request.\
+After receiving this request, the agent must stop sending talks.
+
+#### Talk Broadcast Request (TALK_BROADCAST)
+
+Broadcast to all participating agents when an agent sends a talk in group chat mode.\
+The agent does not need to return anything upon receiving this request.\
+The `new_talk` field in the packet contains the newly sent talk.
+
+#### Whisper Phase Start Request (WHISPER_PHASE_START)
+
+Sent when the whisper phase starts in group chat mode.\
+Behaves the same as the Talk Phase Start Request. Only sent to werewolf agents.
+
+#### Whisper Phase End Request (WHISPER_PHASE_END)
+
+Sent when the whisper phase ends in group chat mode.\
+Behaves the same as the Talk Phase End Request. Only sent to werewolf agents.
+
+#### Whisper Broadcast Request (WHISPER_BROADCAST)
+
+Broadcast to werewolf agents when an agent sends a whisper in group chat mode.\
+The agent does not need to return anything upon receiving this request.\
+The `new_whisper` field in the packet contains the newly sent whisper.
 
 ### Info
 
@@ -192,6 +234,7 @@ The structure that contains the game settings.
 - talk.max.length.mention_length (int | None): Additional character count when mentioning another agent in a talk. If no limit, set to None.
 - talk.max.length.per_agent (int | None): Maximum number of characters per agent per day. If no limit, set to None.
 - talk.max.length.base_length (int | None): Minimum number of characters not included in the daily character limit per agent. If no limit, set to None.
+- talk.duration (int | None): Total time limit for the group chat phase (in seconds). None if not set.
 - talk.max.skip (int): Maximum number of skips per agent per day.
 - whisper.max.count.per_agent (int): Maximum number of whispers per agent per day.
 - whisper.max.count.per_day (int): Maximum number of whispers for all agents per day.
@@ -201,6 +244,7 @@ The structure that contains the game settings.
 - whisper.max.length.mention_length (int | None): Additional character count when mentioning another agent in a whisper. If no limit, set to None.
 - whisper.max.length.per_agent (int | None): Maximum number of characters per agent per day in whispers. If no limit, set to None.
 - whisper.max.length.base_length (int | None): Minimum number of characters not included in the daily whisper character limit per agent. If no limit, set to None.
+- whisper.duration (int | None): Total time limit for the group chat phase (in seconds). None if not set.
 - whisper.max.skip (int): Maximum number of skips per agent per day in whispers.
 - vote.max.count (int): Maximum number of re-votes allowed in case of a tie for first place.
 - vote.allow_self_vote (bool): Whether self-voting is allowed.

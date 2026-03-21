@@ -144,6 +144,26 @@ The guard is only effective if a bodyguard is surviving at this point.\
 If there are no valid votes, no agent is attacked.\
 If an agent is attacked, the result is recorded as the attack result.
 
+### About Communication Modes
+
+In the talk phase and whisper phase, one of the following two communication modes is used depending on the configuration:
+
+- **Turn-based mode**: Used when `duration` is not set. This is the traditional mode where the server sends requests to agents in order and receives responses.
+- **Group chat (freeform) mode**: Used when `duration` is set. Agents can freely send messages within the time limit without waiting for individual requests from the server.
+
+#### Group Chat Mode Processing
+
+1. At the start of the phase, a `TALK_PHASE_START` (or `WHISPER_PHASE_START` for the whisper phase) request is sent to the participating agents.
+2. Agents can freely send text messages to the server within the time limit specified by `duration`.
+3. When the server receives a message from an agent, it validates the speech count and character length limits.
+4. Valid messages are broadcast to all participating agents as a `TALK_BROADCAST` (or `WHISPER_BROADCAST` for the whisper phase) request.
+5. If an agent sends `Over`, that agent can no longer send messages.
+6. When the time limit expires, a `TALK_PHASE_END` (or `WHISPER_PHASE_END` for the whisper phase) request is sent to the participating agents, ending the phase.
+
+> [!NOTE]
+> In group chat mode, the `max_count.per_day` setting is not used.\
+> The `max_count.per_agent` limit on speeches per agent and character length limits are applied in the same way as in the traditional turn-based mode.
+
 ### Turn Handling for Speeches
 
 During the whisper phase, the limit `setting.whisper.max_count` is used.\

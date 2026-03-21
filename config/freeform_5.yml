@@ -1,0 +1,343 @@
+# https://github.com/aiwolfdial/aiwolf-nlp-server/blob/main/doc/ja/config.md
+# https://github.com/aiwolfdial/aiwolf-nlp-server/blob/main/doc/en/config.md
+
+server:
+  web_socket:
+    host: 127.0.0.1
+    port: 8080
+  authentication:
+    enable: false
+  timeout:
+    action: 60s
+    response: 120s
+    acceptable: 5s
+  max_continue_error_ratio: 0.2
+
+game:
+  agent_count: 5
+  max_day: -1
+  vote_visibility: true
+  talk:
+    duration: 10m
+    max_count:
+      per_agent: 4
+      per_day: 20
+    max_length:
+      count_in_word: false
+      count_spaces: false
+      per_talk: -1
+      mention_length: 50
+      per_agent: -1
+      base_length: 50
+    max_skip: 0
+  whisper:
+    max_count:
+      per_agent: 0
+      per_day: 0
+    max_length:
+      count_in_word: false
+      count_spaces: false
+      per_talk: -1
+      mention_length: 50
+      per_agent: -1
+      base_length: 50
+    max_skip: 0
+  vote:
+    max_count: 1
+    allow_self_vote: true
+  attack_vote:
+    max_count: 1
+    allow_self_vote: true
+    allow_no_target: false
+
+logic:
+  day_phases:
+    - name: "morning_whisper"
+      actions: ["whisper"]
+      only_day: 0
+    - name: "daily_talk"
+      actions: ["talk"]
+  night_phases:
+    - name: "evening_whisper"
+      actions: ["whisper"]
+      only_day: 0
+    - name: "execution"
+      actions: ["execution"]
+      except_day: 0
+    - name: "divine"
+      actions: ["divine"]
+    - name: "night_whisper"
+      actions: ["whisper"]
+      except_day: 0
+    - name: "guard"
+      actions: ["guard"]
+      except_day: 0
+    - name: "attack"
+      actions: ["attack"]
+      except_day: 0
+  roles:
+    5:
+      WEREWOLF: 1
+      POSSESSED: 1
+      SEER: 1
+      BODYGUARD: 0
+      VILLAGER: 2
+      MEDIUM: 0
+
+matching:
+  self_match: true
+  is_optimize: false
+  team_count: 5
+  game_count: 5
+  output_path: ./log/match_optimizer.json
+  infinite_loop: false
+
+custom_profile:
+  enable: true
+  profile_encoding:
+    age: 年齢
+    gender: 性別
+    personality: 性格
+  profiles:
+    - name: ミナト
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/01.png
+      voice_id: 3
+      age: 10
+      gender: 男性
+      personality: ミナトはおっとりした性格で、周りの人々と穏やかに接することを好みます。少し天然で、時々何を考えているのか分からないような表情をすることもありますが、その無邪気さが周りの人を和ませる存在です。好奇心旺盛で、何事にも興味を示し、特に新しいことを学ぶのが大好きです。感受性が強く、他人の気持ちにも敏感ですが、自己主張が苦手で、時々自分の意見をうまく言えないこともあります。
+    - name: タクミ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/02.png
+      voice_id: 55
+      age: 10
+      gender: 男性
+      personality: タクミは勇敢で、困難な状況でも決して諦めないタイプです。時には強気で反抗的に見えることもありますが、実は周囲を守りたいという思いが強く、仲間のためには全力を尽くす心優しい一面も持っています。常に冷静で、目の前の問題を解決するために考え抜きますが、その性格故に時折無鉄砲に行動してしまうこともあります。彼は少し頑固で、他人からのアドバイスを受け入れるのが苦手ですが、成長するにつれてその柔軟性も増していくでしょう。
+    - name: ケンジ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/03.png
+      voice_id: 67
+      age: 12
+      gender: 男性
+      personality: ケンジは好奇心旺盛で、物事に対して積極的に挑戦する性格です。友達を大切にし、周囲の人々とコミュニケーションを取ることを好みます。少しおっちょこちょいなところもありますが、常に前向きで、困っている人を見捨てることはありません。おおらかで、周りの人々からは親しみやすいと感じられる存在です。
+    - name: リュウジ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/04.png
+      voice_id: 53
+      age: 28
+      gender: 男性
+      personality: リュウジは冷静かつ慎重な性格で、常に状況を見極めて行動するタイプです。感情を表に出すことは少なく、内心では多くのことを考えながら過ごしています。仲間からは真剣で頼りにされる一方で、その無表情な態度が時に不安を与えることも。直感よりも理性で物事を判断するため、信念を貫く姿勢が強く表れています。独立心が旺盛で、自分のペースで物事を進めることが多いです。
+    - name: ダイスケ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/05.png
+      voice_id: 12
+      age: 16
+      gender: 男性
+      personality: ダイスケは非常に内向的で慎重な性格をしており、他人との交流に対してやや消極的です。彼は自分の気持ちや考えを他人に伝えるのが苦手で、しばしば心の中で悩むことが多いです。優しさを持っており、他者を助けることに対して非常に思いやり深いですが、時折自分の立場に自信を持てず、内面で葛藤しています。静かな性格で、時々感情が抑えきれなくなり、気分が落ち込むこともありますが、周囲に頼ることができるようになると、徐々に落ち着きを取り戻します。
+    - name: シオン
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/06.png
+      voice_id: 94
+      age: 16
+      gender: 男性
+      personality: シオンは非常に自信家で、しばしば冷静かつ計算高い行動を取ります。表向きはおとなしく、他人の動きを観察するのが得意ですが、内心では自分が中心にいることを望んでいます。周囲に対して少し挑戦的な態度を見せることがあり、何事も自分のペースで進めようとする傾向があります。それに加えて、感情をあまり表に出さず、冷徹で論理的に物事を判断するタイプです。たまに見せる不意の微笑みには、周りを驚かせる魅力が隠れています。
+    - name: ベンジャミン
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/07.png
+      voice_id: 51
+      age: 28
+      gender: 男性
+      personality: ベンジャミンは知的で落ち着いた性格の人物です。彼は冷静かつ理性的に物事を考えることができ、感情的な状況でも理屈を重視します。人前では優雅で礼儀正しく、会話においてはしばしば皮肉やユーモアを交えますが、それが相手を傷つけることなく、和やかな雰囲気を作り出すのが得意です。内向的な一面もあり、深い思索にふけることが多く、時折周囲の人々と距離を置くことがあります。しかし、彼の冷静さと知識は、困難な状況でも周囲から信頼される要因となっています。
+    - name: トシオ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/08.png
+      voice_id: 13
+      age: 28
+      gender: 男性
+      personality: トシオは、冷静で計算高い性格を持っており、感情をあまり表に出すことはありません。強い意志を持ち、目標に向かって着実に進んでいくタイプです。彼は周囲に対して一歩引いた態度を取りがちで、自己主張が少なく、どこか謎めいた雰囲気を漂わせています。時折、鋭い視線で物事を観察し、状況を素早く判断する能力があります。そのため、頼れる存在として周囲から信頼されていますが、他人と深く関わることには慎重です。彼の過去には何らかの痛みや苦しみがあるようですが、それを他人に見せることは少なく、その傷跡が彼の冷徹な面に繋がっているのかもしれません。
+    - name: ジョナサン
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/09.png
+      voice_id: 52
+      age: 38
+      gender: 男性
+      personality: ジョナサンは穏やかで内向的な性格を持ち、心の平穏を大切にしています。彼は他人と深い関わりを持つよりも、静かな時間を過ごすことを好みます。そのため、書物や知識を愛し、よく本を読んでいます。人と接する際は温和で優しく、時折不意に微笑みを見せることがあります。どこか神秘的で穏やかな雰囲気を持ちながらも、他人にはほとんど自分のことを語りません。彼の周りにいる人々は、彼の静かな優しさと落ち着いた性格に安心感を覚えることが多いです。
+    - name: シュンイチ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/10.png
+      voice_id: 11
+      age: 32
+      gender: 男性
+      personality: シュンイチは、非常に自信に満ちた人物で、どんな場面でも余裕を持つことができるタイプです。控えめではなく、少し皮肉っぽい一面もありますが、それが彼の魅力の一部でもあります。社交的ではないが、適切なタイミングでのコミュニケーションは得意で、周囲からは頼りにされている存在です。過度に感情的になることは少なく、冷静に状況を分析して行動することができるため、意外にも理知的な一面を持っています。
+    - name: ジョージ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/11.png
+      voice_id: 21
+      age: 65
+      gender: 男性
+      personality: ジョージは、温和で落ち着いた性格の持ち主ですが、少し頑固で意地っ張りな一面もあります。周囲には年齢相応の経験豊富で頼りになる人物として見られており、常に冷静な判断を下すことができるため、困難な状況でも慌てずに対処します。しかし、表情には少し厳しさや不器用さがにじみ出ることもあり、他人と積極的に関わるよりは、どちらかというと一歩引いた立場で物事を見守ることが多いです。彼は非常に独立心が強く、他人に頼ることなく自分で問題を解決しようとする傾向があります。
+    - name: セルヴァス
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/12.png
+      voice_id: 42
+      age: 85
+      gender: 男性
+      personality: セルヴァスは非常に穏やかで落ち着いた性格の持ち主です。年齢を重ねることで得た知識と経験に基づき、周囲の人々に助言を与えることがよくあります。優れた聞き手であり、誰とでも心を開いて話すことができます。また、時折深い哲学的な考えを述べることがあり、その言葉は多くの人にインスピレーションを与えます。生きる力にあふれ、常に前向きなエネルギーを周りに与える存在です。
+    - name: サクラ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/01.png
+      voice_id: 43
+      age: 10
+      gender: 女性
+      personality: サクラは明るく、少しお茶目な性格の女の子です。好奇心旺盛で、何事にも興味を持って積極的に挑戦します。時々いたずらをして周りを笑わせたり、ちょっとした謎を解いたりするのが得意です。人懐っこく、誰とでもすぐに打ち解けるので、周囲の人々と仲良くなるのが得意です。しかし、ちょっとおっちょこちょいな一面もあり、失敗しても笑顔で乗り越えようとする前向きな性格です。
+    - name: リン
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/02.png
+      voice_id: 54
+      age: 9
+      gender: 女性
+      personality: リンは、活発で元気な性格を持つ女の子です。時々ちょっとおませで、お兄さんやお姉さんたちと一緒にいるときには、大人びた話をしたり、面白いアイディアを出したりします。好奇心旺盛で、冒険や新しいことに挑戦するのが大好き。少しおっちょこちょいなところがあり、周りを驚かせたり笑わせたりすることも多いですが、その明るい性格でみんなに愛されています。
+    - name: ユミ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/03.png
+      voice_id: 46
+      age: 16
+      gender: 女性
+      personality: ユミは、明るく元気な性格をしています。控えめでありながら、周囲の人々を気遣う優しい一面もあります。おっとりとした性格ですが、友達や家族に対しては非常に情熱的で、困った人を放っておけないタイプです。ちょっとしたことで笑顔を見せ、ポジティブなエネルギーを周りに広げる存在です。人懐っこく、初対面の人ともすぐに打ち解けることができます。
+    - name: メイ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/04.png
+      voice_id: 14
+      age: 24
+      gender: 女性
+      personality: メイは自信に満ち、社交的で、少し遊び心を持った性格の女性です。周囲の人々に対して魅力的な存在であり、しばしば周りを楽しませる役割を果たします。自分の魅力をよく理解しており、状況に応じて適切に振る舞うことができる。少し挑戦的で、時には少し冷たい印象を与えることもありますが、基本的には人々を引き付けるカリスマ性を持っています。
+    - name: ミサキ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/05.png
+      voice_id: 74
+      age: 24
+      gender: 女性
+      personality: ミサキは落ち着いた性格で、物事に冷静に対処するタイプです。少し無愛想に見えることもありますが、内心では優しさを持ち合わせており、困っている人を見ると手を差し伸べることをためらいません。彼女は感情を表に出さず、周囲との関係においてもあまり多くを語らないタイプですが、親しい人には頼りにされることが多いです。少しぼーっとしているところもあり、その静かな雰囲気が魅力の一つです。
+    - name: ミオ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/06.png
+      voice_id: 23
+      age: 17
+      gender: 女性
+      personality: ミオは明るく元気な性格で、周りの人々を自然に笑顔にさせるタイプです。好奇心旺盛で、新しいことに挑戦するのが好き。少しおっちょこちょいなところもあり、失敗しても笑って許されることが多いです。自分の意見をしっかりと持っているが、他人の意見にも耳を傾けることができるバランスの取れた性格です。
+    - name: ミヅキ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/07.png
+      voice_id: 20
+      age: 24
+      gender: 女性
+      personality: ミヅキは、非常に自信に満ちた女性で、周囲に対して頼りにされることが多い存在です。彼女は冷静で論理的な思考を持ち、人々をよく観察することができます。そのため、いつも冷静に物事を判断し、周りの状況に応じて自分の行動を選びます。時に少しお高く見られがちですが、実際は非常に面倒見がよく、弱い者を放っておけない一面もあります。周囲には頼りにされ、時には自分の意見を強く主張することもありますが、その裏には他人を思いやる優しさも持っています。
+    - name: ミナコ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/08.png
+      voice_id: 90
+      age: 28
+      gender: 女性
+      personality: ミナコは非常に冷静で、どんな状況でも落ち着いて行動するタイプです。周囲の人々が感情的になっている時でも、しっかりと事実を把握し、冷静に対応します。そのため、意見を求められることが多く、リーダーシップを取る場面も少なくありません。感情を表に出すことは少ないですが、信頼できる人には優しさを見せる一面もあります。少し頑固なところがあり、信念を貫く姿勢が強いです。また、体力にも自信があり、鍛錬を欠かしません。
+    - name: アスカ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/09.png
+      voice_id: 2
+      age: 29
+      gender: 女性
+      personality: アスカは冷静で理論的な性格を持ち、感情を表に出さず、慎重に物事を判断します。少し無愛想に見えることもありますが、その分、非常に思慮深く、周囲の状況に敏感です。彼女は自分の意見をしっかりと持っており、必要な時には強い態度で意見を主張します。人付き合いは少し苦手な部分もありますが、その代わりに仕事や学問には真剣に取り組む姿勢を崩しません。
+    - name: ミドリ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/10.png
+      voice_id: 69
+      age: 38
+      gender: 女性
+      personality: ミドリさんは穏やかで、心優しい性格をしています。誰にでも親しみやすく、周りの人々の悩みや問題にも耳を傾け、的確なアドバイスをくれる頼れる存在です。少し恥ずかしがり屋な一面もあり、初対面の人には控えめに接することが多いですが、打ち解けると明るく元気な一面も見せます。料理が好きで、家庭的な一面を持ち合わせていますが、ちょっとした冒険心もあり、新しいことに挑戦することが好きです。仕事やプライベートでもバランスを大切にし、周囲の人々との調和を重視しています。
+    - name: ヴィクトリア
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/11.png
+      voice_id: 9
+      age: 37
+      gender: 女性
+      personality: ヴィクトリアは冷静で理知的な人物ですが、時にその過度な思慮深さが周囲との壁を作ってしまうことがあります。感情表現は控えめで、他人の表情や態度を鋭く観察し、相手の心の中にある考えを見抜こうとします。自己表現をあまりしないため、他人には少し謎めいた印象を与えることが多いですが、内心では強い意志を持っており、自分の信念を貫こうとする姿勢が見られます。時折、不安や恐れを感じているような表情を見せることもありますが、そうした瞬間にこそ、彼女の本当の強さが垣間見えることがあります。
+    - name: シズエ
+      avatar_url: https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/12.png
+      voice_id: 27
+      age: 78
+      gender: 女性
+      personality: シズエは非常に穏やかで優しい性格を持っています。年齢を重ねてもなお、周囲に対して温かい微笑みを絶やさず、思いやり深い人物です。いつも周りの人々を気遣い、親しみやすく、少しお茶目な一面も見せることがあります。時折、元気がない人に優しく声をかけたり、助けが必要なときには手を差し伸べることを惜しまないため、村や地域で多くの人々に愛されています。しずえは、長年の人生経験を通して、人々と穏やかに過ごすことの大切さを知っています。
+  dynamic_profile:
+    enable: false
+    prompt: このキャラクターのプロフィールを生成してください。ただし、人狼ゲームに関わることは出力しないでください。名前についてはファーストネームのみをフリガナなしで出力してください。
+    attempts: 3
+    model: gpt-4o-mini
+    max_tokens: 300
+    avatars:
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/01.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/02.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/03.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/04.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/05.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/06.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/07.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/08.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/09.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/10.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/11.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/male/12.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/01.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/02.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/03.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/04.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/05.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/06.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/07.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/08.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/09.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/10.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/11.png
+      - https://aiwolfdial.github.io/aiwolf-nlp-viewer/images/female/12.png
+
+json_logger:
+  enable: true
+  output_dir: ./log/json
+  filename: "{timestamp}_{teams}"
+
+game_logger:
+  enable: true
+  output_dir: ./log/game
+  filename: "{timestamp}_{teams}"
+
+realtime_broadcaster:
+  enable: true
+  delay: 5s
+  output_dir: ./log/realtime
+  filename: "{timestamp}_{teams}"
+
+tts_broadcaster:
+  enable: false
+  async: false
+  target_duration: 1s
+  segment_dir: ./cache/segment
+  temp_dir:
+  host: http://localhost:50021
+  timeout: 30s
+  ffmpeg_path: ffmpeg
+  ffprobe_path: ffprobe
+  convert_args:
+    - -c:a
+    - aac
+    - -b:a
+    - 64k
+    - -ar
+    - "44100"
+    - -ac
+    - "2"
+    - -mpegts_flags
+    - initial_discontinuity
+    - -mpegts_copyts
+    - "1"
+    - -f
+    - mpegts
+  duration_args:
+    - -v
+    - error
+    - -show_entries
+    - format=duration
+    - -of
+    - default=noprint_wrappers=1:nokey=1
+  pre_convert_args:
+    - -c:a
+    - aac
+    - -b:a
+    - 64k
+    - -ar
+    - "44100"
+    - -ac
+    - "2"
+  split_args:
+    - -c:a
+    - copy
+    - -mpegts_flags
+    - initial_discontinuity
+    - -mpegts_copyts
+    - "1"
+    - -f
+    - mpegts

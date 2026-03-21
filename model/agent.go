@@ -82,31 +82,20 @@ func (a *Agent) SendPacket(packet Packet, actionTimeout, responseTimeout, accept
 	}
 	slog.Info("パケットを送信しました", "agent", a.String(), "packet", packet)
 	if packet.Request.RequireResponse {
-		responseChan := make(chan []byte)
-		errChan := make(chan error)
-		go func() {
-			_, res, err := a.Connection.ReadMessage()
-			if err != nil {
-				errChan <- err
-				return
-			}
-			responseChan <- res
-		}()
-		select {
-		case res := <-responseChan:
+		a.Connection.SetReadDeadline(time.Now().Add(actionTimeout + acceptableTimeout))
+		_, res, err := a.Connection.ReadMessage()
+		a.Connection.SetReadDeadline(time.Time{})
+		if err == nil {
 			response := strings.ReplaceAll(string(res), "\n", "")
 			slog.Info("レスポンスを受信しました", "agent", a.String(), "response", response)
 			return response, nil
-		case err := <-errChan:
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				slog.Error("接続が閉じられました", "error", err)
-				a.HasError = true
-				return "", err
-			}
-			slog.Warn("レスポンスの受信に失敗したため、NAMEリクエストを送信します", "agent", a.String(), "error", err)
-		case <-time.After(actionTimeout + acceptableTimeout):
-			slog.Warn("レスポンスの受信がタイムアウトしたため、NAMEリクエストを送信します", "agent", a.String())
 		}
+		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+			slog.Error("接続が閉じられました", "error", err)
+			a.HasError = true
+			return "", err
+		}
+		slog.Warn("レスポンスの受信に失敗したため、NAMEリクエストを送信します", "agent", a.String(), "error", err)
 		nameReq, err := json.Marshal(Packet{Request: &R_NAME})
 		if err != nil {
 			slog.Error("NAMEパケットの作成に失敗しました", "error", err)
@@ -120,27 +109,39 @@ func (a *Agent) SendPacket(packet Packet, actionTimeout, responseTimeout, accept
 			return "", err
 		}
 		slog.Info("NAMEパケットを送信しました", "agent", a.String())
-		select {
-		case res := <-responseChan:
-			if strings.TrimRight(string(res), "\n") == a.OriginalName {
-				slog.Info("NAMEリクエストのレスポンスを受信しました", "agent", a.String(), "response", string(res))
-				return "", errors.New("リクエストのレスポンス受信がタイムアウトしました")
-			} else {
-				slog.Error("不正なNAMEリクエストのレスポンスを受信しました", "agent", a.String(), "response", string(res))
-				a.HasError = true
-				return "", errors.New("不正なNAMEリクエストのレスポンスを受信しました")
-			}
-		case err := <-errChan:
+		a.Connection.SetReadDeadline(time.Now().Add(responseTimeout))
+		_, res, err = a.Connection.ReadMessage()
+		a.Connection.SetReadDeadline(time.Time{})
+		if err != nil {
 			slog.Error("NAMEリクエストのレスポンス受信に失敗しました", "agent", a.String(), "error", err)
 			a.HasError = true
 			return "", err
-		case <-time.After(responseTimeout):
-			slog.Error("NAMEリクエストのレスポンス受信がタイムアウトしました", "agent", a.String())
-			a.HasError = true
-			return "", errors.New("NAMEリクエストのレスポンス受信がタイムアウトしました")
 		}
+		if strings.TrimRight(string(res), "\n") == a.OriginalName {
+			slog.Info("NAMEリクエストのレスポンスを受信しました", "agent", a.String(), "response", string(res))
+			return "", errors.New("リクエストのレスポンス受信がタイムアウトしました")
+		}
+		slog.Error("不正なNAMEリクエストのレスポンスを受信しました", "agent", a.String(), "response", string(res))
+		a.HasError = true
+		return "", errors.New("不正なNAMEリクエストのレスポンスを受信しました")
 	}
 	return "", nil
+}
+
+func (a *Agent) ReceiveWithTimeout(timeout time.Duration) (string, error) {
+	if a.HasError {
+		return "", errors.New("エージェントにエラーが発生しています")
+	}
+
+	a.Connection.SetReadDeadline(time.Now().Add(timeout))
+	_, res, err := a.Connection.ReadMessage()
+	a.Connection.SetReadDeadline(time.Time{})
+	if err != nil {
+		return "", err
+	}
+
+	response := strings.TrimSpace(string(res))
+	return response, nil
 }
 
 func (a Agent) Close() {
