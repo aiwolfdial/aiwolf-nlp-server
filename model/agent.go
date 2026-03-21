@@ -148,27 +148,15 @@ func (a *Agent) ReceiveWithTimeout(timeout time.Duration) (string, error) {
 		return "", errors.New("エージェントにエラーが発生しています")
 	}
 
-	responseChan := make(chan []byte)
-	errChan := make(chan error)
-
-	go func() {
-		_, res, err := a.Connection.ReadMessage()
-		if err != nil {
-			errChan <- err
-			return
-		}
-		responseChan <- res
-	}()
-
-	select {
-	case res := <-responseChan:
-		response := strings.TrimSpace(string(res))
-		return response, nil
-	case err := <-errChan:
+	a.Connection.SetReadDeadline(time.Now().Add(timeout))
+	_, res, err := a.Connection.ReadMessage()
+	a.Connection.SetReadDeadline(time.Time{})
+	if err != nil {
 		return "", err
-	case <-time.After(timeout):
-		return "", errors.New("受信がタイムアウトしました")
 	}
+
+	response := strings.TrimSpace(string(res))
+	return response, nil
 }
 
 func (a Agent) Close() {
