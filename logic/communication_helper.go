@@ -84,7 +84,7 @@ func (g *Game) processSkipOver(agent *model.Agent, text string, talkSetting *mod
 	return text
 }
 
-func (g *Game) trimTextByLength(agent *model.Agent, text string, talkSetting *model.TalkSetting, remainLengthMap *map[model.Agent]int) string {
+func (g *Game) processText(agent *model.Agent, text string, talkSetting *model.TalkSetting, remainLengthMap *map[model.Agent]int) string {
 	if text == model.T_OVER || text == model.T_SKIP || text == model.T_FORCE_SKIP {
 		return text
 	}
@@ -187,13 +187,13 @@ func (g *Game) trimTextByLength(agent *model.Agent, text string, talkSetting *mo
 	return text
 }
 
-func (g *Game) processAndCreateTalk(agent *model.Agent, text string, idx int, turn int, talkSetting *model.TalkSetting, remainCountMap *map[model.Agent]int, remainLengthMap *map[model.Agent]int, remainSkipMap *map[model.Agent]int) model.Talk {
+func (g *Game) buildTalk(agent *model.Agent, text string, idx int, turn int, talkSetting *model.TalkSetting, remainCountMap *map[model.Agent]int, remainLengthMap *map[model.Agent]int, remainSkipMap *map[model.Agent]int) model.Talk {
 	(*remainCountMap)[*agent]--
 
 	text = g.processSkipOver(agent, text, talkSetting, remainCountMap, remainSkipMap)
 
 	if text != model.T_OVER && text != model.T_SKIP && text != model.T_FORCE_SKIP {
-		text = g.trimTextByLength(agent, text, talkSetting, remainLengthMap)
+		text = g.processText(agent, text, talkSetting, remainLengthMap)
 	}
 
 	return model.Talk{

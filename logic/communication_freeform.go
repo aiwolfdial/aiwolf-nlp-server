@@ -66,7 +66,7 @@ func (g *Game) conductFreeformCommunication(request model.Request, agents []*mod
 					turn := turnMap[*submission.Agent]
 					turnMap[*submission.Agent]++
 
-					talk := g.processAndCreateTalk(submission.Agent, submission.Text, idx, turn, talkSetting, &remainCountMap, &remainLengthMap, &remainSkipMap)
+					talk := g.buildTalk(submission.Agent, submission.Text, idx, turn, talkSetting, &remainCountMap, &remainLengthMap, &remainSkipMap)
 					idx++
 					*talkList = append(*talkList, talk)
 					g.broadcastTalk(talk, agents, request)

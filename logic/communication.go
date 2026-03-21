@@ -65,7 +65,7 @@ func (g *Game) conductTurnBasedCommunication(request model.Request, agents []*mo
 			}
 			text := g.getTalkWhisperText(agent, request)
 
-			talk := g.processAndCreateTalk(agent, text, idx, i, talkSetting, &remainCountMap, &remainLengthMap, &remainSkipMap)
+			talk := g.buildTalk(agent, text, idx, i, talkSetting, &remainCountMap, &remainLengthMap, &remainSkipMap)
 			idx++
 			*talkList = append(*talkList, talk)
 			if talk.Text != model.T_OVER {

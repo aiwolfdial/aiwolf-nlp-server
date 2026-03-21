@@ -167,7 +167,7 @@ func (a *Agent) ReceiveWithTimeout(timeout time.Duration) (string, error) {
 	case err := <-errChan:
 		return "", err
 	case <-time.After(timeout):
-		return "", errors.New("受信タイムアウト")
+		return "", errors.New("受信がタイムアウトしました")
 	}
 }
 
