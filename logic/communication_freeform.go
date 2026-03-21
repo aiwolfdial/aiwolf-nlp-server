@@ -123,11 +123,6 @@ func (s *CommunicationSession) listenForTalks(ctx context.Context, agent *model.
 		case <-ctx.Done():
 			return
 		default:
-			if !s.canAgentTalk(agent) {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-
 			text, err := agent.ReceiveWithTimeout(100 * time.Millisecond)
 			if err != nil {
 				continue
