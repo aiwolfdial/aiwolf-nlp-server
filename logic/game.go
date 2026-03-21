@@ -263,14 +263,6 @@ func (g *Game) executePhase(actions []string) {
 	}
 }
 
-func (g *Game) broadcastPacket(packet model.Packet, agents []*model.Agent) {
-	for _, agent := range agents {
-		if _, err := agent.SendPacket(packet, g.config.Server.Timeout.Action, g.config.Server.Timeout.Response, g.config.Server.Timeout.Acceptable); err != nil {
-			slog.Error("パケットのブロードキャスト送信に失敗しました", "id", g.id, "agent", agent.String(), "request", packet.Request.String(), "error", err)
-		}
-	}
-}
-
 func (g *Game) GetID() string {
 	return g.id
 }

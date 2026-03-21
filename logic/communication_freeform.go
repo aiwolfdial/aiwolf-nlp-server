@@ -16,15 +16,7 @@ type TalkSubmission struct {
 }
 
 func (s *CommunicationSession) runFreeform() {
-	phaseStartPacket := model.Packet{
-		Request: &model.R_TALK_PHASE_START,
-	}
-	if s.request == model.R_WHISPER {
-		phaseStartPacket = model.Packet{
-			Request: &model.R_WHISPER_PHASE_START,
-		}
-	}
-	s.game.broadcastPacket(phaseStartPacket, s.agents)
+	s.sendStart()
 
 	talkChannel := make(chan *TalkSubmission, len(s.agents)*10)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*s.talkSetting.Duration)*time.Millisecond)
@@ -59,7 +51,7 @@ func (s *CommunicationSession) runFreeform() {
 
 					talk := s.buildTalk(submission.Agent, submission.Text, turn)
 					s.appendTalk(talk)
-					s.broadcastTalk(talk)
+					s.sendTalk(talk)
 					s.logTalk(talk)
 				}
 				mu.Unlock()
@@ -73,15 +65,51 @@ func (s *CommunicationSession) runFreeform() {
 	wg.Wait()
 	slog.Info("グループチャット方式の通信を終了します", "id", s.game.id, "totalTalks", s.idx)
 
-	phaseEndPacket := model.Packet{
-		Request: &model.R_TALK_PHASE_END,
-	}
+	s.sendEnd()
+}
+
+func (s *CommunicationSession) sendStart() {
+	request := model.R_TALK_PHASE_START
 	if s.request == model.R_WHISPER {
-		phaseEndPacket = model.Packet{
-			Request: &model.R_WHISPER_PHASE_END,
+		request = model.R_WHISPER_PHASE_START
+	}
+	s.send(request, nil)
+}
+
+func (s *CommunicationSession) sendEnd() {
+	request := model.R_TALK_PHASE_START
+	if s.request == model.R_WHISPER {
+		request = model.R_WHISPER_PHASE_START
+	}
+	s.send(request, nil)
+}
+
+func (s *CommunicationSession) sendTalk(talk model.Talk) {
+	request := model.R_TALK_BROADCAST
+	if s.request == model.R_WHISPER {
+		request = model.R_WHISPER_BROADCAST
+	}
+	s.send(request, &talk)
+}
+
+func (s *CommunicationSession) send(request model.Request, talk *model.Talk) {
+	for _, agent := range s.agents {
+		info := s.game.buildInfo(agent)
+		packet := model.Packet{
+			Request: &request,
+			Info:    &info,
+		}
+		if talk != nil {
+			if request == model.R_TALK_BROADCAST {
+				packet.NewTalk = talk
+			} else {
+				packet.NewWhisper = talk
+			}
+		}
+		if _, err := agent.SendPacket(packet, s.game.config.Server.Timeout.Action, s.game.config.Server.Timeout.Response, s.game.config.Server.Timeout.Acceptable); err != nil {
+			slog.Error("パケットの送信に失敗しました", "id", s.game.id, "agent", agent.String(), "request", request.String(), "error", err)
 		}
 	}
-	s.game.broadcastPacket(phaseEndPacket, s.agents)
 }
 
 func (s *CommunicationSession) validateSubmission(submission *TalkSubmission) bool {
@@ -98,22 +126,6 @@ func (s *CommunicationSession) validateSubmission(submission *TalkSubmission) bo
 	}
 
 	return true
-}
-
-func (s *CommunicationSession) broadcastTalk(talk model.Talk) {
-	broadcastRequest := model.R_TALK_BROADCAST
-	if s.request == model.R_WHISPER {
-		broadcastRequest = model.R_WHISPER_BROADCAST
-	}
-	packet := model.Packet{
-		Request: &broadcastRequest,
-	}
-	if s.request == model.R_TALK {
-		packet.NewTalk = &talk
-	} else {
-		packet.NewWhisper = &talk
-	}
-	s.game.broadcastPacket(packet, s.agents)
 }
 
 func (s *CommunicationSession) listenForTalks(ctx context.Context, agent *model.Agent, talkChannel chan<- *TalkSubmission) {
