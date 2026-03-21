@@ -77,9 +77,9 @@ func (s *CommunicationSession) sendStart() {
 }
 
 func (s *CommunicationSession) sendEnd() {
-	request := model.R_TALK_PHASE_START
+	request := model.R_TALK_PHASE_END
 	if s.request == model.R_WHISPER {
-		request = model.R_WHISPER_PHASE_START
+		request = model.R_WHISPER_PHASE_END
 	}
 	s.send(request, nil)
 }
