@@ -18,8 +18,6 @@ game:
   max_day: -1
   vote_visibility: true
   talk:
-    mode: turn  # "turn" または "freeform"
-    time_limit: 30  # フェーズの時間制限（秒）、freeformモードのみ有効
     max_count:
       per_agent: 4
       per_day: 20
@@ -32,8 +30,6 @@ game:
       base_length: 50
     max_skip: 0
   whisper:
-    mode: turn  # "turn" または "freeform"
-    time_limit: 20  # フェーズの時間制限（秒）、freeformモードのみ有効
     max_count:
       per_agent: 0
       per_day: 0

@@ -32,6 +32,7 @@ type Setting struct {
 }
 
 type TalkSetting struct {
+	Duration *int `json:"duration,omitempty"`
 	MaxCount struct {
 		PerAgent int `json:"per_agent"`
 		PerDay   int `json:"per_day"`
@@ -63,10 +64,10 @@ func NewSetting(config Config) (*Setting, error) {
 			}
 		}
 	}
-	if config.Game.Talk.MaxLength.CountInWord && config.Game.Talk.MaxLength.CountSpaces{
+	if config.Game.Talk.MaxLength.CountInWord && config.Game.Talk.MaxLength.CountSpaces {
 		return nil, errors.New("[Talk] CountInWordとCountSpacesを両方有効にすることはできません")
 	}
-	if config.Game.Whisper.MaxLength.CountInWord && config.Game.Whisper.MaxLength.CountSpaces{
+	if config.Game.Whisper.MaxLength.CountInWord && config.Game.Whisper.MaxLength.CountSpaces {
 		return nil, errors.New("[Whisper] CountInWordとCountSpacesを両方有効にすることはできません")
 	}
 

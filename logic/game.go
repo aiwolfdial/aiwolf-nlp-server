@@ -263,6 +263,12 @@ func (g *Game) executePhase(actions []string) {
 	}
 }
 
+func (g *Game) broadcastPacket(packet model.Packet, agents []*model.Agent) {
+	for _, agent := range agents {
+		agent.SendPacket(packet, g.config.Server.Timeout.Action, g.config.Server.Timeout.Response, g.config.Server.Timeout.Acceptable)
+	}
+}
+
 func (g *Game) GetID() string {
 	return g.id
 }

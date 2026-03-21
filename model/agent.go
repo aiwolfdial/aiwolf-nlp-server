@@ -21,8 +21,6 @@ type Agent struct {
 	Role               Role
 	Connection         *websocket.Conn
 	HasError           bool
-	InTalkPhase        bool
-	InWhisperPhase     bool
 }
 
 func NewAgent(idx int, role Role, conn Connection) *Agent {
@@ -143,27 +141,6 @@ func (a *Agent) SendPacket(packet Packet, actionTimeout, responseTimeout, accept
 		}
 	}
 	return "", nil
-}
-
-func (a *Agent) SendPacketNoResponse(packet Packet) error {
-	if a.HasError {
-		slog.Error("エージェントにエラーが発生しているため、リクエストを送信できません", "agent", a.String())
-		return errors.New("エージェントにエラーが発生しているため、リクエストを送信できません")
-	}
-	req, err := json.Marshal(packet)
-	if err != nil {
-		slog.Error("パケットの作成に失敗しました", "error", err)
-		a.HasError = true
-		return err
-	}
-	err = a.Connection.WriteMessage(websocket.TextMessage, req)
-	if err != nil {
-		slog.Error("パケットの送信に失敗しました", "error", err)
-		a.HasError = true
-		return err
-	}
-	slog.Info("パケットを送信しました（応答なし）", "agent", a.String(), "packet", packet)
-	return nil
 }
 
 func (a *Agent) ReceiveWithTimeout(timeout time.Duration) (string, error) {
