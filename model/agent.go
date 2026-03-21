@@ -11,6 +11,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type AgentMessage struct {
+	Data []byte
+	Err  error
+}
+
 type Agent struct {
 	Idx                int
 	TeamName           string
@@ -21,6 +26,7 @@ type Agent struct {
 	Role               Role
 	Connection         *websocket.Conn
 	HasError           bool
+	msgChan            chan AgentMessage
 }
 
 func NewAgent(idx int, role Role, conn Connection) *Agent {
@@ -35,6 +41,7 @@ func NewAgent(idx int, role Role, conn Connection) *Agent {
 		Connection:         conn.Conn,
 		HasError:           false,
 	}
+	agent.startReader()
 	slog.Info("エージェントを作成しました", "idx", agent.Idx, "agent", agent.String(), "role", agent.Role, "connection", agent.Connection.RemoteAddr())
 	return agent
 }
@@ -59,8 +66,50 @@ func NewAgentWithProfile(idx int, role Role, conn Connection, profile Profile, e
 		Connection:         conn.Conn,
 		HasError:           false,
 	}
+	agent.startReader()
 	slog.Info("エージェントを作成しました", "idx", agent.Idx, "agent", agent.String(), "profile", agent.ProfileDescription, "role", agent.Role, "connection", agent.Connection.RemoteAddr())
 	return agent
+}
+
+func (a *Agent) startReader() {
+	a.msgChan = make(chan AgentMessage, 100)
+	go func() {
+		for {
+			_, data, err := a.Connection.ReadMessage()
+			a.msgChan <- AgentMessage{Data: data, Err: err}
+			if err != nil {
+				return
+			}
+		}
+	}()
+}
+
+func (a *Agent) ReadChannel() <-chan AgentMessage {
+	// freeformモードなどで直接selectするためのチャネルを返す
+	return a.msgChan
+}
+
+func (a *Agent) receive(timeout time.Duration) ([]byte, error) {
+	// チャネルからタイムアウト付きでメッセージを受信する
+	select {
+	case msg := <-a.msgChan:
+		if msg.Err != nil {
+			return nil, msg.Err
+		}
+		return msg.Data, nil
+	case <-time.After(timeout):
+		return nil, errors.New("レスポンスの受信がタイムアウトしました")
+	}
+}
+
+func (a *Agent) DrainMessages() {
+	for {
+		select {
+		case <-a.msgChan:
+		default:
+			return
+		}
+	}
 }
 
 func (a *Agent) SendPacket(packet Packet, actionTimeout, responseTimeout, acceptableTimeout time.Duration) (string, error) {
@@ -82,11 +131,9 @@ func (a *Agent) SendPacket(packet Packet, actionTimeout, responseTimeout, accept
 	}
 	slog.Info("パケットを送信しました", "agent", a.String(), "packet", packet)
 	if packet.Request.RequireResponse {
-		a.Connection.SetReadDeadline(time.Now().Add(actionTimeout + acceptableTimeout))
-		_, res, err := a.Connection.ReadMessage()
-		a.Connection.SetReadDeadline(time.Time{})
+		data, err := a.receive(actionTimeout + acceptableTimeout)
 		if err == nil {
-			response := strings.ReplaceAll(string(res), "\n", "")
+			response := strings.ReplaceAll(string(data), "\n", "")
 			slog.Info("レスポンスを受信しました", "agent", a.String(), "response", response)
 			return response, nil
 		}
@@ -109,19 +156,17 @@ func (a *Agent) SendPacket(packet Packet, actionTimeout, responseTimeout, accept
 			return "", err
 		}
 		slog.Info("NAMEパケットを送信しました", "agent", a.String())
-		a.Connection.SetReadDeadline(time.Now().Add(responseTimeout))
-		_, res, err = a.Connection.ReadMessage()
-		a.Connection.SetReadDeadline(time.Time{})
+		data, err = a.receive(responseTimeout)
 		if err != nil {
 			slog.Error("NAMEリクエストのレスポンス受信に失敗しました", "agent", a.String(), "error", err)
 			a.HasError = true
 			return "", err
 		}
-		if strings.TrimRight(string(res), "\n") == a.OriginalName {
-			slog.Info("NAMEリクエストのレスポンスを受信しました", "agent", a.String(), "response", string(res))
+		if strings.TrimRight(string(data), "\n") == a.OriginalName {
+			slog.Info("NAMEリクエストのレスポンスを受信しました", "agent", a.String(), "response", string(data))
 			return "", errors.New("リクエストのレスポンス受信がタイムアウトしました")
 		}
-		slog.Error("不正なNAMEリクエストのレスポンスを受信しました", "agent", a.String(), "response", string(res))
+		slog.Error("不正なNAMEリクエストのレスポンスを受信しました", "agent", a.String(), "response", string(data))
 		a.HasError = true
 		return "", errors.New("不正なNAMEリクエストのレスポンスを受信しました")
 	}
@@ -133,15 +178,12 @@ func (a *Agent) ReceiveWithTimeout(timeout time.Duration) (string, error) {
 		return "", errors.New("エージェントにエラーが発生しています")
 	}
 
-	a.Connection.SetReadDeadline(time.Now().Add(timeout))
-	_, res, err := a.Connection.ReadMessage()
-	a.Connection.SetReadDeadline(time.Time{})
+	data, err := a.receive(timeout)
 	if err != nil {
 		return "", err
 	}
 
-	response := strings.TrimSpace(string(res))
-	return response, nil
+	return strings.TrimSpace(string(data)), nil
 }
 
 func (a Agent) Close() {

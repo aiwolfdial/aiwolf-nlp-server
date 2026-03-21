@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -54,6 +55,12 @@ func (s *CommunicationSession) runFreeform() {
 					s.sendTalk(talk)
 					s.logTalk(talk)
 				}
+				if s.allAgentsDone() {
+					slog.Info("全エージェントの発言が終了したため、早期終了します", "id", s.game.id)
+					cancel()
+					mu.Unlock()
+					return
+				}
 				mu.Unlock()
 
 			case <-ctx.Done():
@@ -64,6 +71,11 @@ func (s *CommunicationSession) runFreeform() {
 
 	wg.Wait()
 	slog.Info("グループチャット方式の通信を終了します", "id", s.game.id, "totalTalks", s.idx)
+
+	// フェーズ終了後、チャネルに残った未処理メッセージを破棄
+	for _, agent := range s.agents {
+		agent.DrainMessages()
+	}
 
 	s.sendEnd()
 }
@@ -131,14 +143,14 @@ func (s *CommunicationSession) validateSubmission(submission *TalkSubmission) bo
 func (s *CommunicationSession) listenForTalks(ctx context.Context, agent *model.Agent, talkChannel chan<- *TalkSubmission) {
 	for {
 		select {
-		case <-ctx.Done():
-			return
-		default:
-			text, err := agent.ReceiveWithTimeout(100 * time.Millisecond)
-			if err != nil {
-				continue
+		case msg := <-agent.ReadChannel():
+			if msg.Err != nil {
+				slog.Warn("エージェントの接続でエラーが発生したためリスンを終了します", "id", s.game.id, "agent", agent.String(), "error", msg.Err)
+				agent.HasError = true
+				return
 			}
 
+			text := strings.TrimSpace(string(msg.Data))
 			if text == "" {
 				continue
 			}
@@ -160,6 +172,9 @@ func (s *CommunicationSession) listenForTalks(ctx context.Context, agent *model.
 				slog.Info("エージェントがOverを送信しました", "id", s.game.id, "agent", agent.String())
 				return
 			}
+
+		case <-ctx.Done():
+			return
 		}
 	}
 }

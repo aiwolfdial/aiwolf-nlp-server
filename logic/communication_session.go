@@ -73,6 +73,15 @@ func (s *CommunicationSession) cleanup() {
 	gs.RemainSkipMap = nil
 }
 
+func (s *CommunicationSession) allAgentsDone() bool {
+	for _, agent := range s.agents {
+		if s.remainCountMap[*agent] > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *CommunicationSession) canAgentTalk(agent *model.Agent) bool {
 	if s.remainCountMap[*agent] <= 0 {
 		return false
