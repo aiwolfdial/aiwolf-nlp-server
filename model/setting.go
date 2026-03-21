@@ -65,10 +65,10 @@ func NewSetting(config Config) (*Setting, error) {
 		}
 	}
 	if config.Game.Talk.MaxLength.CountInWord && config.Game.Talk.MaxLength.CountSpaces {
-		return nil, errors.New("[Talk] CountInWordとCountSpacesを両方有効にすることはできません")
+		return nil, errors.New("TalkのCountInWordとCountSpacesを両方有効にすることはできません")
 	}
 	if config.Game.Whisper.MaxLength.CountInWord && config.Game.Whisper.MaxLength.CountSpaces {
-		return nil, errors.New("[Whisper] CountInWordとCountSpacesを両方有効にすることはできません")
+		return nil, errors.New("WhisperのCountInWordとCountSpacesを両方有効にすることはできません")
 	}
 
 	setting := Setting{
@@ -145,6 +145,14 @@ func NewSetting(config Config) (*Setting, error) {
 	}
 	if config.Game.MaxDay != -1 {
 		setting.MaxDay = &config.Game.MaxDay
+	}
+	if config.Game.Talk.Duration != nil {
+		d := int(config.Game.Talk.Duration.Milliseconds())
+		setting.Talk.Duration = &d
+	}
+	if config.Game.Whisper.Duration != nil {
+		d := int(config.Game.Whisper.Duration.Milliseconds())
+		setting.Whisper.Duration = &d
 	}
 	if config.Game.Talk.MaxLength.PerTalk != -1 {
 		setting.Talk.MaxLength.CountInWord = &config.Game.Talk.MaxLength.CountInWord

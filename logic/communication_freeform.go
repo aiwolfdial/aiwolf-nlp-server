@@ -27,7 +27,7 @@ func (s *CommunicationSession) runFreeform() {
 	s.game.broadcastPacket(phaseStartPacket, s.agents)
 
 	talkChannel := make(chan *TalkSubmission, len(s.agents)*10)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*s.talkSetting.Duration)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*s.talkSetting.Duration)*time.Millisecond)
 	defer cancel()
 
 	var wg sync.WaitGroup
