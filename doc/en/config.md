@@ -39,6 +39,10 @@
 
 ### talk (Talk Phase Settings)
 
+- `duration`: The total time limit for the group chat (freeform) communication phase.
+  When this is set, communication uses the group chat mode instead of the turn-based mode.
+  When not set, the traditional turn-based mode is used.
+
 #### max_count (Max Speaking Count Settings)
 
 - `per_agent`: The maximum number of times a single agent can speak per day.
