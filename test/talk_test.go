@@ -48,7 +48,22 @@ func executeTalkPhase(t *testing.T, sendMessagesMap map[string][]string, config 
 			defer talkMu.Unlock()
 			assert.Equal(t, len(expectTalks), len(tc.talkHistory))
 			if len(expectTalks) > 0 {
-				assert.Equal(t, expectTalks, tc.talkHistory)
+				stripped := make([]any, len(tc.talkHistory))
+				for i, entry := range tc.talkHistory {
+					if m, ok := entry.(map[string]any); ok {
+						copied := make(map[string]any, len(m))
+						for k, v := range m {
+							if k == "time" {
+								continue
+							}
+							copied[k] = v
+						}
+						stripped[i] = copied
+					} else {
+						stripped[i] = entry
+					}
+				}
+				assert.Equal(t, expectTalks, stripped)
 			}
 
 			messageIdx := messageIdxMap[tc.originalName]

@@ -50,7 +50,7 @@ func (s *CommunicationSession) runFreeform() {
 					turn := turnMap[*submission.Agent]
 					turnMap[*submission.Agent]++
 
-					talk := s.buildTalk(submission.Agent, submission.Text, turn)
+					talk := s.buildTalk(submission.Agent, submission.Text, turn, submission.Time)
 					s.appendTalk(talk)
 					s.sendTalk(talk)
 					s.logTalk(talk)

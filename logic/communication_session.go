@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
@@ -225,7 +226,7 @@ func (s *CommunicationSession) processText(agent *model.Agent, text string) stri
 	return text
 }
 
-func (s *CommunicationSession) buildTalk(agent *model.Agent, text string, turn int) model.Talk {
+func (s *CommunicationSession) buildTalk(agent *model.Agent, text string, turn int, talkTime time.Time) model.Talk {
 	s.remainCountMap[*agent]--
 
 	text = s.processSkipOver(agent, text)
@@ -240,6 +241,7 @@ func (s *CommunicationSession) buildTalk(agent *model.Agent, text string, turn i
 		Turn:  turn,
 		Agent: *agent,
 		Text:  text,
+		Time:  talkTime,
 	}
 	s.idx++
 
@@ -252,10 +254,14 @@ func (s *CommunicationSession) appendTalk(talk model.Talk) {
 
 func (s *CommunicationSession) logTalk(talk model.Talk) {
 	if s.game.gameLogger != nil {
-		if s.request == model.R_TALK {
-			s.game.gameLogger.AppendLog(s.game.id, fmt.Sprintf("%d,talk,%d,%d,%d,%s", s.game.currentDay, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text))
+		kind := "talk"
+		if s.request != model.R_TALK {
+			kind = "whisper"
+		}
+		if s.talkSetting.Duration != nil {
+			s.game.gameLogger.AppendLog(s.game.id, fmt.Sprintf("%d,%s,%d,%d,%d,%s,%d", s.game.currentDay, kind, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text, talk.Time.UnixMilli()))
 		} else {
-			s.game.gameLogger.AppendLog(s.game.id, fmt.Sprintf("%d,whisper,%d,%d,%d,%s", s.game.currentDay, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text))
+			s.game.gameLogger.AppendLog(s.game.id, fmt.Sprintf("%d,%s,%d,%d,%d,%s", s.game.currentDay, kind, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text))
 		}
 	}
 	if s.game.realtimeBroadcaster != nil {

@@ -3,6 +3,7 @@ package logic
 import (
 	"log/slog"
 	"math/rand"
+	"time"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 )
@@ -20,7 +21,7 @@ func (s *CommunicationSession) runTurnBased() {
 			}
 			text := s.game.getTalkWhisperText(agent, s.request)
 
-			talk := s.buildTalk(agent, text, i)
+			talk := s.buildTalk(agent, text, i, time.Now())
 			s.appendTalk(talk)
 			if talk.Text != model.T_OVER {
 				cnt = true
