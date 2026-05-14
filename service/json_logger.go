@@ -124,6 +124,53 @@ func (j *JSONLogger) TrackEndRequest(id string, agent model.Agent, response stri
 	}
 }
 
+func (j *JSONLogger) TrackTalk(id string, agent model.Agent, request model.Request, talk model.Talk) {
+	if dataInterface, exists := j.data.Load(id); exists {
+		data := dataInterface.(*JSONLog)
+
+		entry := map[string]any{
+			"agent":              agent.String(),
+			"response":           talk.Text,
+			"request_timestamp":  talk.Time.Unix(),
+			"response_timestamp": talk.Time.Unix(),
+		}
+
+		if jsonData, marshalErr := json.Marshal(request); marshalErr == nil {
+			entry["request"] = string(jsonData)
+		}
+
+		data.mu.Lock()
+		data.entries = append(data.entries, entry)
+		data.mu.Unlock()
+
+		j.saveGameData(id)
+	}
+}
+
+func (j *JSONLogger) TrackPhase(id string, request model.Request) {
+	if dataInterface, exists := j.data.Load(id); exists {
+		data := dataInterface.(*JSONLog)
+
+		now := time.Now().Unix()
+
+		entry := map[string]any{
+			"agent":              "",
+			"request_timestamp":  now,
+			"response_timestamp": now,
+		}
+
+		if jsonData, marshalErr := json.Marshal(request); marshalErr == nil {
+			entry["request"] = string(jsonData)
+		}
+
+		data.mu.Lock()
+		data.entries = append(data.entries, entry)
+		data.mu.Unlock()
+
+		j.saveGameData(id)
+	}
+}
+
 func (j *JSONLogger) saveGameData(id string) {
 	if dataInterface, exists := j.data.Load(id); exists {
 		data := dataInterface.(*JSONLog)

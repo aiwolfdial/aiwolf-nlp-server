@@ -3,6 +3,7 @@ package logic
 import (
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 	"github.com/aiwolfdial/aiwolf-nlp-server/util"
@@ -176,6 +177,7 @@ func (g *Game) getRealtimeBroadcastPacket() model.BroadcastPacket {
 		ToIdx:     nil,
 		BubbleIdx: nil,
 	}
+	packet.Timestamp = time.Now().Unix()
 	for _, a := range g.agents {
 		agent := struct {
 			Idx     int     `json:"idx"`

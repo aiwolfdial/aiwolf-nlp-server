@@ -19,4 +19,5 @@ type BroadcastPacket struct {
 	FromIdx   *int    `json:"from_idx,omitempty"`
 	ToIdx     *int    `json:"to_idx,omitempty"`
 	BubbleIdx *int    `json:"bubble_idx,omitempty"`
+	Timestamp int64   `json:"timestamp"`
 }

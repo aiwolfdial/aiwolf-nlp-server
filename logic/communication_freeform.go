@@ -54,6 +54,9 @@ func (s *CommunicationSession) runFreeform() {
 					s.appendTalk(talk)
 					s.sendTalk(talk)
 					s.logTalk(talk)
+					if s.game.jsonLogger != nil {
+						s.game.jsonLogger.TrackTalk(s.game.id, *submission.Agent, s.request, talk)
+					}
 				}
 				if s.allAgentsDone() {
 					slog.Info("全エージェントの発言が終了したため、早期終了します", "id", s.game.id)
@@ -86,6 +89,9 @@ func (s *CommunicationSession) sendStart() {
 		request = model.R_WHISPER_PHASE_START
 	}
 	s.send(request, nil)
+	if s.game.jsonLogger != nil {
+		s.game.jsonLogger.TrackPhase(s.game.id, request)
+	}
 }
 
 func (s *CommunicationSession) sendEnd() {
@@ -94,6 +100,9 @@ func (s *CommunicationSession) sendEnd() {
 		request = model.R_WHISPER_PHASE_END
 	}
 	s.send(request, nil)
+	if s.game.jsonLogger != nil {
+		s.game.jsonLogger.TrackPhase(s.game.id, request)
+	}
 }
 
 func (s *CommunicationSession) sendTalk(talk model.Talk) {
