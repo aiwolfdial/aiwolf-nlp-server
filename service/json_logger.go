@@ -83,7 +83,7 @@ func (j *JSONLogger) TrackEndGame(id string, winSide model.Team) {
 func (j *JSONLogger) TrackStartRequest(id string, agent model.Agent, packet model.Packet) {
 	if dataInterface, exists := j.data.Load(id); exists {
 		data := dataInterface.(*JSONLog)
-		data.timestampMap.Store(agent.OriginalName, time.Now().UnixNano())
+		data.timestampMap.Store(agent.OriginalName, time.Now().Unix())
 		data.requestMap.Store(agent.OriginalName, packet)
 	}
 }
@@ -91,15 +91,15 @@ func (j *JSONLogger) TrackStartRequest(id string, agent model.Agent, packet mode
 func (j *JSONLogger) TrackEndRequest(id string, agent model.Agent, response string, err error) {
 	if dataInterface, exists := j.data.Load(id); exists {
 		data := dataInterface.(*JSONLog)
-		timestamp := time.Now().UnixNano()
+		timestamp := time.Now().Unix()
 
 		entry := map[string]any{
 			"agent":              agent.String(),
-			"response_timestamp": timestamp / 1e6,
+			"response_timestamp": timestamp,
 		}
 
 		if requestTimestampInterface, exists := data.timestampMap.LoadAndDelete(agent.OriginalName); exists {
-			entry["request_timestamp"] = requestTimestampInterface.(int64) / 1e6
+			entry["request_timestamp"] = requestTimestampInterface.(int64)
 		}
 
 		if requestInterface, exists := data.requestMap.LoadAndDelete(agent.OriginalName); exists {
