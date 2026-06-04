@@ -258,11 +258,7 @@ func (s *CommunicationSession) logTalk(talk model.Talk) {
 		if s.request != model.R_TALK {
 			kind = "whisper"
 		}
-		if s.talkSetting.Duration != nil {
-			s.game.gameLogger.AppendLog(s.game.id, fmt.Sprintf("%d,%s,%d,%d,%d,%s,%d", s.game.currentDay, kind, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text, talk.Time.UnixMilli()))
-		} else {
-			s.game.gameLogger.AppendLog(s.game.id, fmt.Sprintf("%d,%s,%d,%d,%d,%s", s.game.currentDay, kind, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text))
-		}
+		s.game.gameLogger.AppendLog(s.game.id, fmt.Sprintf("%d,%s,%d,%d,%d,%s,%d", s.game.currentDay, kind, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text, talk.Time.Unix()))
 	}
 	if s.game.realtimeBroadcaster != nil {
 		packet := s.game.getRealtimeBroadcastPacket()

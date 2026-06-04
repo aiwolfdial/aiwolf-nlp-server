@@ -83,7 +83,7 @@ func (j *JSONLogger) TrackEndGame(id string, winSide model.Team) {
 func (j *JSONLogger) TrackStartRequest(id string, agent model.Agent, packet model.Packet) {
 	if dataInterface, exists := j.data.Load(id); exists {
 		data := dataInterface.(*JSONLog)
-		data.timestampMap.Store(agent.OriginalName, time.Now().UnixNano())
+		data.timestampMap.Store(agent.OriginalName, time.Now().Unix())
 		data.requestMap.Store(agent.OriginalName, packet)
 	}
 }
@@ -91,15 +91,15 @@ func (j *JSONLogger) TrackStartRequest(id string, agent model.Agent, packet mode
 func (j *JSONLogger) TrackEndRequest(id string, agent model.Agent, response string, err error) {
 	if dataInterface, exists := j.data.Load(id); exists {
 		data := dataInterface.(*JSONLog)
-		timestamp := time.Now().UnixNano()
+		timestamp := time.Now().Unix()
 
 		entry := map[string]any{
 			"agent":              agent.String(),
-			"response_timestamp": timestamp / 1e6,
+			"response_timestamp": timestamp,
 		}
 
 		if requestTimestampInterface, exists := data.timestampMap.LoadAndDelete(agent.OriginalName); exists {
-			entry["request_timestamp"] = requestTimestampInterface.(int64) / 1e6
+			entry["request_timestamp"] = requestTimestampInterface.(int64)
 		}
 
 		if requestInterface, exists := data.requestMap.LoadAndDelete(agent.OriginalName); exists {
@@ -114,6 +114,53 @@ func (j *JSONLogger) TrackEndRequest(id string, agent model.Agent, response stri
 
 		if err != nil {
 			entry["error"] = err.Error()
+		}
+
+		data.mu.Lock()
+		data.entries = append(data.entries, entry)
+		data.mu.Unlock()
+
+		j.saveGameData(id)
+	}
+}
+
+func (j *JSONLogger) TrackTalk(id string, agent model.Agent, request model.Request, talk model.Talk) {
+	if dataInterface, exists := j.data.Load(id); exists {
+		data := dataInterface.(*JSONLog)
+
+		entry := map[string]any{
+			"agent":              agent.String(),
+			"response":           talk.Text,
+			"request_timestamp":  talk.Time.Unix(),
+			"response_timestamp": talk.Time.Unix(),
+		}
+
+		if jsonData, marshalErr := json.Marshal(request); marshalErr == nil {
+			entry["request"] = string(jsonData)
+		}
+
+		data.mu.Lock()
+		data.entries = append(data.entries, entry)
+		data.mu.Unlock()
+
+		j.saveGameData(id)
+	}
+}
+
+func (j *JSONLogger) TrackPhase(id string, request model.Request) {
+	if dataInterface, exists := j.data.Load(id); exists {
+		data := dataInterface.(*JSONLog)
+
+		now := time.Now().Unix()
+
+		entry := map[string]any{
+			"agent":              "",
+			"request_timestamp":  now,
+			"response_timestamp": now,
+		}
+
+		if jsonData, marshalErr := json.Marshal(request); marshalErr == nil {
+			entry["request"] = string(jsonData)
 		}
 
 		data.mu.Lock()
