@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # ---- runtime stage ----
 # CGO無効の静的バイナリ向けに最小の distroless/static を使う。
 # イメージを軽量に保つためTTS（ffmpeg/VOICEVOX）は含めない。VOICEVOXは別コンテナで動かし
-# AIWOLF_TTS_HOST で接続する。
+# 設定ファイルの tts_broadcaster.host で接続する。
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /out/aiwolf-nlp-server /aiwolf-nlp-server
 # 既定の設定を同梱して単体で起動できるようにする。/config をマウントすれば上書き可能。
