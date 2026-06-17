@@ -130,7 +130,9 @@ func (s *CommunicationSession) processText(agent *model.Agent, text string) stri
 	}
 
 	mention := ""
-	commonText := ""
+	// per_agent / base_length が両方無効な場合でも本文が失われないよう、
+	// commonText は入力テキストで初期化する（下のブロックが走る場合は必ず上書きされる）
+	commonText := text
 	mentionText := ""
 
 	if s.talkSetting.MaxLength.PerAgent != nil || s.talkSetting.MaxLength.BaseLength != nil {
