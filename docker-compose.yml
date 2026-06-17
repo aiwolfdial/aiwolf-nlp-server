@@ -1,0 +1,34 @@
+services:
+  server:
+    build:
+      context: .
+      args:
+        VERSION: docker
+    image: aiwolf-nlp-server:local
+    ports:
+      - "8080:8080"
+    environment:
+      # コンテナ内では全インターフェースで待ち受け、公開ポートをホストへマップする。
+      AIWOLF_HOST: "0.0.0.0"
+      AIWOLF_PORT: "8080"
+      # ログをマウントした /log 配下に永続化する。
+      AIWOLF_JSON_LOG_DIR: "/log/json"
+      AIWOLF_GAME_LOG_DIR: "/log/game"
+      AIWOLF_REALTIME_DIR: "/log/realtime"
+      # server.authentication.enable が有効なときのみ必要。
+      SECRET_KEY: "${SECRET_KEY:-}"
+      # TTS利用時は下の voicevox サービスを指す。
+      # AIWOLF_TTS_HOST: "http://voicevox:50021"
+    volumes:
+      - ./config:/config
+      - ./log:/log
+    command: ["-c", "/config/default_5.yml"]
+
+  # TTS用の任意のVOICEVOXエンジン。利用するにはこのサービスのコメントを外し、上の
+  # AIWOLF_TTS_HOST を設定する（設定ファイルで tts_broadcaster も有効にする）。
+  # スリムなサーバイメージには ffmpeg が無いため、TTSを使う場合は ffmpeg 入りの
+  # イメージ（alpineベース + apk add ffmpeg）をビルドすること。
+  # voicevox:
+  #   image: voicevox/voicevox_engine:cpu-latest
+  #   ports:
+  #     - "50021:50021"

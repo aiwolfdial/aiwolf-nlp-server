@@ -37,7 +37,7 @@ func NewJSONLogger(config model.Config) *JSONLogger {
 	}
 }
 
-func (j *JSONLogger) TrackStartGame(id string, agents []*model.Agent) {
+func (j *JSONLogger) TrackStartGame(id string, agents []model.AgentView) {
 	data := &JSONLog{
 		id:      id,
 		agents:  make([]any, 0),
@@ -80,15 +80,15 @@ func (j *JSONLogger) TrackEndGame(id string, winSide model.Team) {
 	}
 }
 
-func (j *JSONLogger) TrackStartRequest(id string, agent model.Agent, packet model.Packet) {
+func (j *JSONLogger) TrackStartRequest(id string, agent model.AgentView, request json.RawMessage) {
 	if dataInterface, exists := j.data.Load(id); exists {
 		data := dataInterface.(*JSONLog)
 		data.timestampMap.Store(agent.OriginalName, time.Now().Unix())
-		data.requestMap.Store(agent.OriginalName, packet)
+		data.requestMap.Store(agent.OriginalName, request)
 	}
 }
 
-func (j *JSONLogger) TrackEndRequest(id string, agent model.Agent, response string, err error) {
+func (j *JSONLogger) TrackEndRequest(id string, agent model.AgentView, response string, err error) {
 	if dataInterface, exists := j.data.Load(id); exists {
 		data := dataInterface.(*JSONLog)
 		timestamp := time.Now().Unix()
@@ -103,8 +103,8 @@ func (j *JSONLogger) TrackEndRequest(id string, agent model.Agent, response stri
 		}
 
 		if requestInterface, exists := data.requestMap.LoadAndDelete(agent.OriginalName); exists {
-			if jsonData, marshalErr := json.Marshal(requestInterface); marshalErr == nil {
-				entry["request"] = string(jsonData)
+			if raw, ok := requestInterface.(json.RawMessage); ok && len(raw) > 0 {
+				entry["request"] = string(raw)
 			}
 		}
 
@@ -124,7 +124,7 @@ func (j *JSONLogger) TrackEndRequest(id string, agent model.Agent, response stri
 	}
 }
 
-func (j *JSONLogger) TrackTalk(id string, agent model.Agent, request model.Request, talk model.Talk) {
+func (j *JSONLogger) TrackTalk(id string, agent model.AgentView, request model.Request, talk model.TalkView) {
 	if dataInterface, exists := j.data.Load(id); exists {
 		data := dataInterface.(*JSONLog)
 

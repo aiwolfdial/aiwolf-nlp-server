@@ -1,4 +1,4 @@
-package core
+package matchmaking
 
 import (
 	"errors"
@@ -12,6 +12,7 @@ import (
 type WaitingRoom struct {
 	agentCount  int
 	selfMatch   bool
+	mu          sync.Mutex
 	connections sync.Map
 }
 
@@ -23,16 +24,32 @@ func NewWaitingRoom(config model.Config) *WaitingRoom {
 }
 
 func (wr *WaitingRoom) AddConnection(team string, connection model.Connection) {
+	// チーム毎の値はスライスで、追加は読み書きを伴う。同一チームの同時接続（自己対戦など）で
+	// 背後の配列を競合させたり要素を取りこぼさないよう直列化する。
+	wr.mu.Lock()
 	value, _ := wr.connections.LoadOrStore(team, []model.Connection{})
 	connections := value.([]model.Connection)
 
 	updatedConnections := append(connections, connection)
 	wr.connections.Store(team, updatedConnections)
+	wr.mu.Unlock()
 
 	slog.Info("新しいクライアントが待機部屋に追加されました", "team", team, "remote_addr", connection.Conn.RemoteAddr().String())
 }
 
+// 待機中のチーム名を返す。マッチオプティマイザへのチーム登録に使う。
+func (wr *WaitingRoom) Teams() []string {
+	var teams []string
+	wr.connections.Range(func(key, _ any) bool {
+		teams = append(teams, key.(string))
+		return true
+	})
+	return teams
+}
+
 func (wr *WaitingRoom) GetConnectionsWithMatchOptimizer(matches []map[model.Role][]string) (map[model.Role][]model.Connection, error) {
+	wr.mu.Lock()
+	defer wr.mu.Unlock()
 	var roleMapConns = make(map[model.Role][]model.Connection)
 
 	if len(matches) == 0 {
@@ -92,6 +109,8 @@ func (wr *WaitingRoom) GetConnectionsWithMatchOptimizer(matches []map[model.Role
 }
 
 func (wr *WaitingRoom) GetConnections() ([]model.Connection, error) {
+	wr.mu.Lock()
+	defer wr.mu.Unlock()
 	connections := []model.Connection{}
 	ready := false
 

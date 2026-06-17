@@ -54,9 +54,7 @@ func (s *CommunicationSession) runFreeform() {
 					s.appendTalk(talk)
 					s.sendTalk(talk)
 					s.logTalk(talk)
-					if s.game.jsonLogger != nil {
-						s.game.jsonLogger.TrackTalk(s.game.id, *submission.Agent, s.request, talk)
-					}
+					s.game.obs.OnFreeformTalk(s.game.id, submission.Agent.View(), s.request, talk.View())
 				}
 				if s.allAgentsDone() {
 					slog.Info("全エージェントの発言が終了したため、早期終了します", "id", s.game.id)
@@ -89,9 +87,7 @@ func (s *CommunicationSession) sendStart() {
 		request = model.R_WHISPER_PHASE_START
 	}
 	s.send(request, nil)
-	if s.game.jsonLogger != nil {
-		s.game.jsonLogger.TrackPhase(s.game.id, request)
-	}
+	s.game.obs.OnPhase(s.game.id, request)
 }
 
 func (s *CommunicationSession) sendEnd() {
@@ -100,9 +96,7 @@ func (s *CommunicationSession) sendEnd() {
 		request = model.R_WHISPER_PHASE_END
 	}
 	s.send(request, nil)
-	if s.game.jsonLogger != nil {
-		s.game.jsonLogger.TrackPhase(s.game.id, request)
-	}
+	s.game.obs.OnPhase(s.game.id, request)
 }
 
 func (s *CommunicationSession) sendTalk(talk model.Talk) {
@@ -127,7 +121,7 @@ func (s *CommunicationSession) send(request model.Request, talk *model.Talk) {
 				packet.NewWhisper = talk
 			}
 		}
-		if _, err := agent.SendPacket(packet, s.game.config.Server.Timeout.Action, s.game.config.Server.Timeout.Response, s.game.config.Server.Timeout.Acceptable); err != nil {
+		if _, err := agent.SendPacket(packet, s.game.ruleset.ActionTimeout(), s.game.ruleset.ResponseTimeout(), s.game.ruleset.AcceptableTimeout()); err != nil {
 			slog.Error("パケットの送信に失敗しました", "id", s.game.id, "agent", agent.String(), "request", request.String(), "error", err)
 		}
 	}

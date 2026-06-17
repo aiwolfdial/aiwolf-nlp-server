@@ -3,6 +3,7 @@ package util
 import (
 	"maps"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -71,11 +72,14 @@ func CreateAgentsWithProfiles(conns []model.Connection, roles map[model.Role]int
 	maps.Copy(rolesCopy, roles)
 	agents := make([]*model.Agent, 0)
 
-	rand.Shuffle(len(profiles), func(i, j int) { profiles[i], profiles[j] = profiles[j], profiles[i] })
+	// 呼び出し元と共有するprofilesスライスを破壊しないようコピーをシャッフルする。
+	// 共有のままだと並行するゲーム同士でプロファイル割り当てが壊れる。
+	profilesCopy := slices.Clone(profiles)
+	rand.Shuffle(len(profilesCopy), func(i, j int) { profilesCopy[i], profilesCopy[j] = profilesCopy[j], profilesCopy[i] })
 
 	for i, conn := range conns {
 		role := assignRole(rolesCopy)
-		agent := model.NewAgentWithProfile(i+1, role, conn, profiles[i], encoding)
+		agent := model.NewAgentWithProfile(i+1, role, conn, profilesCopy[i], encoding)
 		agents = append(agents, agent)
 	}
 	return agents
@@ -97,12 +101,14 @@ func CreateAgentsWithRole(roleMapConns map[model.Role][]model.Connection) []*mod
 func CreateAgentsWithRoleAndProfile(roleMapConns map[model.Role][]model.Connection, profiles []model.Profile, encoding map[string]string) []*model.Agent {
 	agents := make([]*model.Agent, 0)
 
-	rand.Shuffle(len(profiles), func(i, j int) { profiles[i], profiles[j] = profiles[j], profiles[i] })
+	// 呼び出し元と共有するprofilesスライスを破壊しないようコピーをシャッフルする。
+	profilesCopy := slices.Clone(profiles)
+	rand.Shuffle(len(profilesCopy), func(i, j int) { profilesCopy[i], profilesCopy[j] = profilesCopy[j], profilesCopy[i] })
 
 	i := 0
 	for role, conns := range roleMapConns {
 		for _, conn := range conns {
-			profile := profiles[i]
+			profile := profilesCopy[i]
 			agent := model.NewAgentWithProfile(i+1, role, conn, profile, encoding)
 			i++
 			agents = append(agents, agent)
@@ -171,16 +177,16 @@ func TrimLength(text string, length int, inWord bool, countSpaces bool) string {
 	if inWord {
 		return trimByWords(text, length)
 	}
-	
+
 	currentLength := CountLength(text, inWord, countSpaces)
 	if currentLength <= length {
 		return text
 	}
-	
+
 	if countSpaces {
 		return trimByRunes(text, length)
 	}
-	
+
 	return trimByNonSpaceCount(text, length)
 }
 
@@ -203,7 +209,7 @@ func trimByRunes(text string, maxRunes int) string {
 func trimByNonSpaceCount(text string, maxNonSpaceChars int) string {
 	runes := []rune(text)
 	nonSpaceCount := 0
-	
+
 	for i, r := range runes {
 		if !unicode.IsSpace(r) {
 			nonSpaceCount++
@@ -212,6 +218,6 @@ func trimByNonSpaceCount(text string, maxNonSpaceChars int) string {
 			}
 		}
 	}
-	
+
 	return text
 }

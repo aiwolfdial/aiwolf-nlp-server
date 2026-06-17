@@ -47,16 +47,6 @@ const (
 	S_NONE     Species = "NONE"
 )
 
-func SpeciesFromString(s string) Species {
-	switch s {
-	case "HUMAN":
-		return S_HUMAN
-	case "WEREWOLF":
-		return S_WEREWOLF
-	}
-	return S_NONE
-}
-
 func (r Role) String() string {
 	return r.Name
 }

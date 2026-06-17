@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -29,10 +28,12 @@ func newCommunicationSession(game *Game, request model.Request, agents []*model.
 
 	switch request {
 	case model.R_TALK:
-		talkSetting = &game.setting.Talk.TalkSetting
+		ts := game.setting.TalkSetting()
+		talkSetting = &ts
 		talkList = &game.getCurrentGameStatus().Talks
 	case model.R_WHISPER:
-		talkSetting = &game.setting.Whisper.TalkSetting
+		ts := game.setting.WhisperSetting()
+		talkSetting = &ts
 		talkList = &game.getCurrentGameStatus().Whispers
 	default:
 		return nil
@@ -253,25 +254,10 @@ func (s *CommunicationSession) appendTalk(talk model.Talk) {
 }
 
 func (s *CommunicationSession) logTalk(talk model.Talk) {
-	if s.game.gameLogger != nil {
-		kind := "talk"
-		if s.request != model.R_TALK {
-			kind = "whisper"
-		}
-		s.game.gameLogger.AppendLog(s.game.id, fmt.Sprintf("%d,%s,%d,%d,%d,%s,%d", s.game.currentDay, kind, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text, talk.Time.Unix()))
+	var voiceID *int
+	if talk.Agent.Profile != nil {
+		v := talk.Agent.Profile.VoiceID
+		voiceID = &v
 	}
-	if s.game.realtimeBroadcaster != nil {
-		packet := s.game.getRealtimeBroadcastPacket()
-		if s.request == model.R_TALK {
-			packet.Event = "トーク"
-		} else {
-			packet.Event = "囁き"
-		}
-		packet.Message = &talk.Text
-		packet.BubbleIdx = &talk.Agent.Idx
-		s.game.realtimeBroadcaster.Broadcast(packet)
-	}
-	if s.game.ttsBroadcaster != nil && talk.Agent.Profile != nil {
-		s.game.ttsBroadcaster.BroadcastText(s.game.id, talk.Text, talk.Agent.Profile.VoiceID)
-	}
+	s.game.obs.OnTalk(s.game.id, s.game.currentDay, s.request, talk.View(), voiceID, s.game.gameState())
 }

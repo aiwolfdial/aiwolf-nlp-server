@@ -1,9 +1,9 @@
 package logic
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
-	"time"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 	"github.com/aiwolfdial/aiwolf-nlp-server/util"
@@ -54,10 +54,10 @@ func (g *Game) buildInfo(agent *model.Agent) model.Info {
 		if lastGameStatus.AttackedAgent != nil {
 			info.AttackedAgent = lastGameStatus.AttackedAgent
 		}
-		if g.setting.VoteVisibility {
+		if g.setting.VoteVisibility() {
 			info.VoteList = lastGameStatus.Votes
 		}
-		if g.setting.VoteVisibility && agent.Role == model.R_WEREWOLF {
+		if g.setting.VoteVisibility() && agent.Role == model.R_WEREWOLF {
 			info.AttackVoteList = lastGameStatus.AttackVotes
 		}
 	}
@@ -100,7 +100,7 @@ func (g *Game) requestToAgent(agent *model.Agent, request model.Request) (string
 		packet = model.Packet{Request: &request}
 	case model.R_INITIALIZE, model.R_DAILY_INITIALIZE:
 		g.resetLastIdxMaps()
-		packet = model.Packet{Request: &request, Info: &info, Setting: g.setting}
+		packet = model.Packet{Request: &request, Info: &info, Setting: g.setting.Snapshot()}
 		if request == model.R_INITIALIZE {
 			packet.Info.Profile = agent.ProfileDescription
 		}
@@ -121,13 +121,10 @@ func (g *Game) requestToAgent(agent *model.Agent, request model.Request) (string
 	default:
 		return "", errors.New("一致するリクエストがありません")
 	}
-	if g.jsonLogger != nil {
-		g.jsonLogger.TrackStartRequest(g.id, *agent, packet)
-	}
-	resp, err := agent.SendPacket(packet, g.config.Server.Timeout.Action, g.config.Server.Timeout.Response, g.config.Server.Timeout.Acceptable)
-	if g.jsonLogger != nil {
-		g.jsonLogger.TrackEndRequest(g.id, *agent, resp, err)
-	}
+	reqBytes, _ := json.Marshal(packet)
+	g.obs.OnRequest(g.id, agent.View(), reqBytes)
+	resp, err := agent.SendPacket(packet, g.ruleset.ActionTimeout(), g.ruleset.ResponseTimeout(), g.ruleset.AcceptableTimeout())
+	g.obs.OnResponse(g.id, agent.View(), resp, err)
 	return resp, err
 }
 
@@ -164,30 +161,12 @@ func (g *Game) isAlive(agent *model.Agent) bool {
 	return g.getCurrentGameStatus().StatusMap[*agent] == model.S_ALIVE
 }
 
-func (g *Game) getRealtimeBroadcastPacket() model.BroadcastPacket {
-	g.realtimeBroadcasterPacketIdx++
-	packet := model.BroadcastPacket{
-		Id:        g.id,
-		Idx:       g.realtimeBroadcasterPacketIdx,
-		Day:       g.currentDay,
-		IsDay:     g.isDaytime,
-		Event:     "なし",
-		Message:   nil,
-		FromIdx:   nil,
-		ToIdx:     nil,
-		BubbleIdx: nil,
-	}
-	packet.Timestamp = time.Now().Unix()
+// gameState は現時点のゲーム状態スナップショットを返す。realtime sink がこれから
+// ブロードキャストパケットを組み立てる。
+func (g *Game) gameState() model.GameState {
+	agents := make([]model.BroadcastAgent, 0, len(g.agents))
 	for _, a := range g.agents {
-		agent := struct {
-			Idx     int     `json:"idx"`
-			Team    string  `json:"team"`
-			Name    string  `json:"name"`
-			Profile *string `json:"profile,omitempty"`
-			Avatar  *string `json:"avatar,omitempty"`
-			Role    string  `json:"role"`
-			IsAlive bool    `json:"is_alive"`
-		}{
+		agent := model.BroadcastAgent{
 			Idx:     a.Idx,
 			Team:    a.TeamName,
 			Name:    a.GameName,
@@ -198,15 +177,35 @@ func (g *Game) getRealtimeBroadcastPacket() model.BroadcastPacket {
 		if a.Profile != nil {
 			agent.Avatar = &a.Profile.AvatarURL
 		}
-		packet.Agents = append(packet.Agents, agent)
+		agents = append(agents, agent)
 	}
-	return packet
+	return model.GameState{Day: g.currentDay, IsDaytime: g.isDaytime, Agents: agents}
+}
+
+// agentStatuses は .log の status 行に使うエージェント単位の情報を返す。
+func (g *Game) agentStatuses() []model.AgentStatus {
+	statusMap := g.getCurrentGameStatus().StatusMap
+	statuses := make([]model.AgentStatus, 0, len(g.agents))
+	for _, agent := range g.agents {
+		statuses = append(statuses, model.AgentStatus{
+			Idx:          agent.Idx,
+			Role:         agent.Role.Name,
+			Status:       statusMap[*agent].String(),
+			OriginalName: agent.OriginalName,
+			GameName:     agent.GameName,
+		})
+	}
+	return statuses
 }
 
 func (g *Game) GetRoleTeamNamesMap() map[model.Role][]string {
 	return util.GetRoleTeamNamesMap(g.agents)
 }
 
+func (g *Game) AgentViews() []model.AgentView {
+	return model.ViewsOf(g.agents)
+}
+
 func (g *Game) IsFinished() bool {
-	return g.isFinished
+	return g.isFinished.Load()
 }

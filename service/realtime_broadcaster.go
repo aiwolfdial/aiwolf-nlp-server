@@ -22,8 +22,8 @@ type RealtimeBroadcaster struct {
 type RealtimeBroadcasterLog struct {
 	id        string
 	filename  string
-	agents    []any
 	logs      []string
+	packetIdx int
 	logsMu    sync.Mutex
 	updatedAt time.Time
 }
@@ -44,18 +44,9 @@ func NewRealtimeBroadcaster(config model.Config) *RealtimeBroadcaster {
 	return rb
 }
 
-func (rb *RealtimeBroadcaster) TrackStartGame(id string, agents []*model.Agent) {
-	agentData := make([]any, 0, len(agents))
+func (rb *RealtimeBroadcaster) TrackStartGame(id string, agents []model.AgentView) {
 	teamNames := make([]string, 0, len(agents))
-
 	for _, agent := range agents {
-		agentInfo := map[string]any{
-			"idx":  agent.Idx,
-			"team": agent.TeamName,
-			"name": agent.OriginalName,
-			"role": agent.Role,
-		}
-		agentData = append(agentData, agentInfo)
 		teamNames = append(teamNames, agent.TeamName)
 	}
 
@@ -67,7 +58,6 @@ func (rb *RealtimeBroadcaster) TrackStartGame(id string, agents []*model.Agent) 
 	gameLog := &RealtimeBroadcasterLog{
 		id:        id,
 		filename:  filename,
-		agents:    agentData,
 		logs:      make([]string, 0),
 		updatedAt: time.Now(),
 	}
@@ -90,26 +80,66 @@ func (rb *RealtimeBroadcaster) TrackEndGame(id string) {
 	}
 }
 
-func (rb *RealtimeBroadcaster) Broadcast(packet model.BroadcastPacket) {
+// Emit はゲーム状態スナップショットとイベント固有の情報からパケットを組み立てて配信する。
+// パケットのidxはゲーム単位で連番。
+func (rb *RealtimeBroadcaster) Emit(id string, state model.GameState, event string, message *string, fromIdx *int, toIdx *int, bubbleIdx *int) {
+	gameLogInterface, exists := rb.data.Load(id)
+	if !exists {
+		return
+	}
+	gameLog := gameLogInterface.(*RealtimeBroadcasterLog)
+
+	gameLog.logsMu.Lock()
+	gameLog.packetIdx++
+	packet := model.BroadcastPacket{
+		Id:        id,
+		Idx:       gameLog.packetIdx,
+		Day:       state.Day,
+		IsDay:     state.IsDaytime,
+		Agents:    state.Agents,
+		Event:     event,
+		Message:   message,
+		FromIdx:   fromIdx,
+		ToIdx:     toIdx,
+		BubbleIdx: bubbleIdx,
+		Timestamp: time.Now().Unix(),
+	}
 	data, err := json.Marshal(packet)
 	if err != nil {
+		gameLog.logsMu.Unlock()
 		slog.Error("パケットのJSON化に失敗しました", "error", err)
 		return
 	}
+	// 毎パケットでの全書き換え（パケット数に対しO(n^2)）を避け、新規行のみ追記する。
+	// 結果のファイルは従来と同一（"\n"区切り）。1ゲームの書き込みは所有goroutineで直列。
+	firstLine := len(gameLog.logs) == 0
+	gameLog.logs = append(gameLog.logs, string(data))
+	gameLog.updatedAt = time.Now()
+	filename := gameLog.filename
+	gameLog.logsMu.Unlock()
 
-	if gameLogInterface, exists := rb.data.Load(packet.Id); exists {
-		gameLog := gameLogInterface.(*RealtimeBroadcasterLog)
-		gameLog.logsMu.Lock()
-		gameLog.logs = append(gameLog.logs, string(data))
-		gameLog.updatedAt = time.Now()
-		logs := make([]string, len(gameLog.logs))
-		copy(logs, gameLog.logs)
-		filename := gameLog.filename
-		gameLog.logsMu.Unlock()
+	rb.appendGameFileLine(filename, string(data), firstLine)
+	rb.writeGamesListFile()
+	slog.Info("JSONLファイルにブロードキャストを保存しました", "game_id", id)
+}
 
-		rb.writeGameFile(filename, logs)
-		rb.writeGamesListFile()
-		slog.Info("JSONLファイルにブロードキャストを保存しました", "game_id", packet.Id)
+func (rb *RealtimeBroadcaster) appendGameFileLine(filename string, line string, firstLine bool) {
+	filePath := filepath.Join(rb.config.OutputDir, fmt.Sprintf("%s.jsonl", filename))
+	flag := os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	content := "\n" + line
+	if firstLine {
+		// ファイルを新規化し、先頭行は改行なしで書く。
+		flag = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
+		content = line
+	}
+	file, err := os.OpenFile(filePath, flag, 0644)
+	if err != nil {
+		slog.Error("ゲームファイルのオープンに失敗しました", "error", err, "path", filePath)
+		return
+	}
+	defer file.Close()
+	if _, err := file.WriteString(content); err != nil {
+		slog.Error("ゲームファイルへの追記に失敗しました", "error", err, "path", filePath)
 	}
 }
 
@@ -122,11 +152,15 @@ func (rb *RealtimeBroadcaster) writeGamesListFile() {
 	items := make([]Item, 0)
 	rb.data.Range(func(_, value any) bool {
 		gameLog := value.(*RealtimeBroadcasterLog)
+		// updatedAtは所有ゲームのgoroutineがlogsMu下で更新するため、別ゲームからの
+		// 一覧更新でも安全に読めるようロックする。
+		gameLog.logsMu.Lock()
 		item := Item{
 			ID:        gameLog.id,
 			Filename:  gameLog.filename,
 			UpdatedAt: gameLog.updatedAt,
 		}
+		gameLog.logsMu.Unlock()
 		items = append(items, item)
 		return true
 	})
