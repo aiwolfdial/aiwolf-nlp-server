@@ -105,13 +105,11 @@ func (g *Game) Start() model.Team {
 	slog.Info("ゲームを開始します", "id", g.id)
 	g.obs.OnGameStart(g.id, model.ViewsOf(g.agents))
 	g.obs.OnStreamCreate(g.id)
-	{
-		packet := g.getRealtimeBroadcastPacket()
-		packet.Event = "開始"
-		message := "ゲームが開始されました"
-		packet.Message = &message
-		g.obs.OnBroadcast(packet)
-	}
+	startPacket := g.getRealtimeBroadcastPacket()
+	startPacket.Event = "開始"
+	startMessage := "ゲームが開始されました"
+	startPacket.Message = &startMessage
+	g.obs.OnBroadcast(startPacket)
 	g.obs.OnSpeak(g.id, "ゲームが開始されました", 23)
 	g.requestToEveryone(model.R_INITIALIZE)
 	for {
@@ -135,13 +133,11 @@ func (g *Game) Start() model.Team {
 	}
 	villagers, werewolves := util.CountAliveTeams(g.getCurrentGameStatus().StatusMap)
 	g.obs.OnLogLine(g.id, fmt.Sprintf("%d,result,%d,%d,%s", g.currentDay, villagers, werewolves, g.winSide))
-	{
-		packet := g.getRealtimeBroadcastPacket()
-		packet.Event = "終了"
-		message := string(g.winSide)
-		packet.Message = &message
-		g.obs.OnBroadcast(packet)
-	}
+	endPacket := g.getRealtimeBroadcastPacket()
+	endPacket.Event = "終了"
+	endMessage := string(g.winSide)
+	endPacket.Message = &endMessage
+	g.obs.OnBroadcast(endPacket)
 	g.obs.OnSpeak(g.id, "ゲームが終了しました", 23)
 	g.closeAllAgents()
 	g.obs.OnGameEnd(g.id, g.winSide)

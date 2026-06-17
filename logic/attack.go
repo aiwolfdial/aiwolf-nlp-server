@@ -37,31 +37,25 @@ func (g *Game) doAttack() {
 			g.getCurrentGameStatus().StatusMap[*attacked] = model.S_DEAD
 			g.getCurrentGameStatus().AttackedAgent = attacked
 			g.obs.OnLogLine(g.id, fmt.Sprintf("%d,attack,%d,true", g.currentDay, attacked.Idx))
-			{
-				packet := g.getRealtimeBroadcastPacket()
-				packet.Event = "襲撃"
-				packet.ToIdx = &attacked.Idx
-				g.obs.OnBroadcast(packet)
-			}
+			packet := g.getRealtimeBroadcastPacket()
+			packet.Event = "襲撃"
+			packet.ToIdx = &attacked.Idx
+			g.obs.OnBroadcast(packet)
 			slog.Info("襲撃結果を設定しました", "id", g.id, "agent", attacked.String())
 		} else if attacked != nil {
 			g.obs.OnLogLine(g.id, fmt.Sprintf("%d,attack,%d,false", g.currentDay, attacked.Idx))
-			{
-				packet := g.getRealtimeBroadcastPacket()
-				packet.Event = "襲撃"
-				idx := -1
-				packet.FromIdx = &idx
-				packet.ToIdx = &attacked.Idx
-				g.obs.OnBroadcast(packet)
-			}
+			packet := g.getRealtimeBroadcastPacket()
+			packet.Event = "襲撃"
+			idx := -1
+			packet.FromIdx = &idx
+			packet.ToIdx = &attacked.Idx
+			g.obs.OnBroadcast(packet)
 			slog.Info("護衛されたため、襲撃結果を設定しません", "id", g.id, "agent", attacked.String())
 		} else {
 			g.obs.OnLogLine(g.id, fmt.Sprintf("%d,attack,-1,true", g.currentDay))
-			{
-				packet := g.getRealtimeBroadcastPacket()
-				packet.Event = "襲撃"
-				g.obs.OnBroadcast(packet)
-			}
+			packet := g.getRealtimeBroadcastPacket()
+			packet.Event = "襲撃"
+			g.obs.OnBroadcast(packet)
 			slog.Info("襲撃対象がいないため、襲撃結果を設定しません", "id", g.id)
 		}
 	}

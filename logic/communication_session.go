@@ -260,17 +260,15 @@ func (s *CommunicationSession) logTalk(talk model.Talk) {
 		kind = "whisper"
 	}
 	s.game.obs.OnLogLine(s.game.id, fmt.Sprintf("%d,%s,%d,%d,%d,%s,%d", s.game.currentDay, kind, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text, talk.Time.Unix()))
-	{
-		packet := s.game.getRealtimeBroadcastPacket()
-		if s.request == model.R_TALK {
-			packet.Event = "トーク"
-		} else {
-			packet.Event = "囁き"
-		}
-		packet.Message = &talk.Text
-		packet.BubbleIdx = &talk.Agent.Idx
-		s.game.obs.OnBroadcast(packet)
+	packet := s.game.getRealtimeBroadcastPacket()
+	if s.request == model.R_TALK {
+		packet.Event = "トーク"
+	} else {
+		packet.Event = "囁き"
 	}
+	packet.Message = &talk.Text
+	packet.BubbleIdx = &talk.Agent.Idx
+	s.game.obs.OnBroadcast(packet)
 	if talk.Agent.Profile != nil {
 		s.game.obs.OnSpeak(s.game.id, talk.Text, talk.Agent.Profile.VoiceID)
 	}
