@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -20,27 +19,6 @@ func executeCommand(name string, arg ...string) ([]byte, error) {
 	}
 	slog.Debug("コマンドの実行に成功しました", "name", name, "arg", arg, "output", string(out))
 	return out, nil
-}
-
-func CopyFile(sourcePath string, destinationPath string) error {
-	sourceFile, err := os.Open(sourcePath)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-
-	if err := os.MkdirAll(filepath.Dir(destinationPath), 0755); err != nil {
-		return err
-	}
-
-	destFile, err := os.Create(destinationPath)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	return err
 }
 
 type ConvertWavToSegmentParams struct {

@@ -22,7 +22,6 @@ type RealtimeBroadcaster struct {
 type RealtimeBroadcasterLog struct {
 	id        string
 	filename  string
-	agents    []any
 	logs      []string
 	packetIdx int
 	logsMu    sync.Mutex
@@ -46,17 +45,8 @@ func NewRealtimeBroadcaster(config model.Config) *RealtimeBroadcaster {
 }
 
 func (rb *RealtimeBroadcaster) TrackStartGame(id string, agents []model.AgentView) {
-	agentData := make([]any, 0, len(agents))
 	teamNames := make([]string, 0, len(agents))
-
 	for _, agent := range agents {
-		agentInfo := map[string]any{
-			"idx":  agent.Idx,
-			"team": agent.TeamName,
-			"name": agent.OriginalName,
-			"role": agent.Role,
-		}
-		agentData = append(agentData, agentInfo)
 		teamNames = append(teamNames, agent.TeamName)
 	}
 
@@ -68,7 +58,6 @@ func (rb *RealtimeBroadcaster) TrackStartGame(id string, agents []model.AgentVie
 	gameLog := &RealtimeBroadcasterLog{
 		id:        id,
 		filename:  filename,
-		agents:    agentData,
 		logs:      make([]string, 0),
 		updatedAt: time.Now(),
 	}

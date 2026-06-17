@@ -16,6 +16,10 @@ func (rb *RealtimeBroadcaster) AsObserver() observer.GameObserver {
 	return o
 }
 
+// realtime 固有のファイルライフサイクル（作成/確定）を、共有 Broadcaster による
+// 開始/終了パケットの配信と組み合わせる。Emit はエントリが存在する間しか配信できないため、
+// 作成→配信、配信→確定(削除) の順を守る。
+
 func (o realtimeBroadcasterObserver) OnGameStart(id string, agents []model.AgentView, state model.GameState) {
 	o.b.TrackStartGame(id, agents)
 	o.Broadcaster.OnGameStart(id, agents, state)
