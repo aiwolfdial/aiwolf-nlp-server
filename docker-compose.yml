@@ -8,27 +8,26 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # Bind to all interfaces inside the container; the published port maps to
-      # the host. See doc/ for the full list of AIWOLF_* overrides.
+      # コンテナ内では全インターフェースで待ち受け、公開ポートをホストへマップする。
       AIWOLF_HOST: "0.0.0.0"
       AIWOLF_PORT: "8080"
-      # Persist logs under the mounted /log volume.
+      # ログをマウントした /log 配下に永続化する。
       AIWOLF_JSON_LOG_DIR: "/log/json"
       AIWOLF_GAME_LOG_DIR: "/log/game"
       AIWOLF_REALTIME_DIR: "/log/realtime"
-      # Required only when server.authentication.enable is true.
+      # server.authentication.enable が有効なときのみ必要。
       SECRET_KEY: "${SECRET_KEY:-}"
-      # Point at the VOICEVOX sidecar below if TTS is enabled in the config.
+      # TTS利用時は下の voicevox サービスを指す。
       # AIWOLF_TTS_HOST: "http://voicevox:50021"
     volumes:
       - ./config:/config
       - ./log:/log
     command: ["-c", "/config/default_5.yml"]
 
-  # Optional VOICEVOX engine for TTS. Uncomment this service and set
-  # AIWOLF_TTS_HOST above (and enable tts_broadcaster in the config) to use it.
-  # NOTE: the slim server image has no ffmpeg; build a TTS-enabled image (alpine
-  # base + `apk add ffmpeg`) if you rely on TTS.
+  # TTS用の任意のVOICEVOXエンジン。利用するにはこのサービスのコメントを外し、上の
+  # AIWOLF_TTS_HOST を設定する（設定ファイルで tts_broadcaster も有効にする）。
+  # スリムなサーバイメージには ffmpeg が無いため、TTSを使う場合は ffmpeg 入りの
+  # イメージ（alpineベース + apk add ffmpeg）をビルドすること。
   # voicevox:
   #   image: voicevox/voicevox_engine:cpu-latest
   #   ports:

@@ -6,14 +6,11 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 )
 
-// Composite fans out every event to a fixed set of observers in registration
-// order. The slice is set once at construction and never mutated afterwards, so
-// a Composite is safe for concurrent use.
+// 登録順に各observerへイベントを配信する。構築後はスライスを変更しないため並行安全。
 type Composite struct {
 	observers []GameObserver
 }
 
-// NewComposite builds a Composite, dropping any nil observers.
 func NewComposite(observers ...GameObserver) *Composite {
 	filtered := make([]GameObserver, 0, len(observers))
 	for _, o := range observers {

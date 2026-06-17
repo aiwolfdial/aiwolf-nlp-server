@@ -100,10 +100,8 @@ func (rb *RealtimeBroadcaster) Broadcast(packet model.BroadcastPacket) {
 	if gameLogInterface, exists := rb.data.Load(packet.Id); exists {
 		gameLog := gameLogInterface.(*RealtimeBroadcasterLog)
 		gameLog.logsMu.Lock()
-		// Append only the new line to disk instead of rewriting the whole file on
-		// every packet, which was O(n^2) in the number of packets. The resulting
-		// file is byte-for-byte the same as before (lines joined by "\n"). Writes
-		// for a single game are serialized on its owning goroutine.
+		// 毎パケットでの全書き換え（パケット数に対しO(n^2)）を避け、新規行のみ追記する。
+		// 結果のファイルは従来と同一（"\n"区切り）。1ゲームの書き込みは所有goroutineで直列。
 		firstLine := len(gameLog.logs) == 0
 		gameLog.logs = append(gameLog.logs, string(data))
 		gameLog.updatedAt = time.Now()
@@ -121,7 +119,7 @@ func (rb *RealtimeBroadcaster) appendGameFileLine(filename string, line string, 
 	flag := os.O_APPEND | os.O_CREATE | os.O_WRONLY
 	content := "\n" + line
 	if firstLine {
-		// Start the file fresh and write the first line without a leading newline.
+		// ファイルを新規化し、先頭行は改行なしで書く。
 		flag = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
 		content = line
 	}
@@ -145,8 +143,8 @@ func (rb *RealtimeBroadcaster) writeGamesListFile() {
 	items := make([]Item, 0)
 	rb.data.Range(func(_, value any) bool {
 		gameLog := value.(*RealtimeBroadcasterLog)
-		// updatedAt is mutated under logsMu by Broadcast on the owning game's
-		// goroutine; lock here so a concurrent game's list refresh reads it safely.
+		// updatedAtは所有ゲームのgoroutineがlogsMu下で更新するため、別ゲームからの
+		// 一覧更新でも安全に読めるようロックする。
 		gameLog.logsMu.Lock()
 		item := Item{
 			ID:        gameLog.id,

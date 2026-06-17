@@ -7,14 +7,11 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 )
 
-// jsonLoggerObserver adapts JSONLogger to the observer.GameObserver interface.
-// It embeds NoopObserver so it only has to implement the events it cares about.
 type jsonLoggerObserver struct {
 	observer.NoopObserver
 	l *JSONLogger
 }
 
-// AsObserver returns the JSONLogger as a GameObserver.
 func (j *JSONLogger) AsObserver() observer.GameObserver {
 	return jsonLoggerObserver{l: j}
 }

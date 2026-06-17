@@ -2,9 +2,6 @@ package model
 
 import "testing"
 
-// TestApplyEnvOverridesNoopWhenUnset verifies that with no environment variables
-// set, ApplyEnvOverrides leaves the config untouched (preserving file-only
-// behaviour).
 func TestApplyEnvOverridesNoopWhenUnset(t *testing.T) {
 	c := Config{}
 	c.Server.WebSocket.Host = "127.0.0.1"
@@ -18,8 +15,6 @@ func TestApplyEnvOverridesNoopWhenUnset(t *testing.T) {
 	}
 }
 
-// TestApplyEnvOverridesApplies verifies that set environment variables override
-// the corresponding runtime fields.
 func TestApplyEnvOverridesApplies(t *testing.T) {
 	t.Setenv("AIWOLF_HOST", "0.0.0.0")
 	t.Setenv("AIWOLF_PORT", "9999")

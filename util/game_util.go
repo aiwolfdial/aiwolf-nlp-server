@@ -72,8 +72,8 @@ func CreateAgentsWithProfiles(conns []model.Connection, roles map[model.Role]int
 	maps.Copy(rolesCopy, roles)
 	agents := make([]*model.Agent, 0)
 
-	// Shuffle a copy so we never mutate the caller's (shared) profiles slice;
-	// concurrent games would otherwise corrupt each other's profile assignment.
+	// 呼び出し元と共有するprofilesスライスを破壊しないようコピーをシャッフルする。
+	// 共有のままだと並行するゲーム同士でプロファイル割り当てが壊れる。
 	profilesCopy := slices.Clone(profiles)
 	rand.Shuffle(len(profilesCopy), func(i, j int) { profilesCopy[i], profilesCopy[j] = profilesCopy[j], profilesCopy[i] })
 
@@ -101,7 +101,7 @@ func CreateAgentsWithRole(roleMapConns map[model.Role][]model.Connection) []*mod
 func CreateAgentsWithRoleAndProfile(roleMapConns map[model.Role][]model.Connection, profiles []model.Profile, encoding map[string]string) []*model.Agent {
 	agents := make([]*model.Agent, 0)
 
-	// Shuffle a copy so we never mutate the caller's (shared) profiles slice.
+	// 呼び出し元と共有するprofilesスライスを破壊しないようコピーをシャッフルする。
 	profilesCopy := slices.Clone(profiles)
 	rand.Shuffle(len(profilesCopy), func(i, j int) { profilesCopy[i], profilesCopy[j] = profilesCopy[j], profilesCopy[i] })
 

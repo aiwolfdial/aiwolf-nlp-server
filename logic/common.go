@@ -205,8 +205,6 @@ func (g *Game) GetRoleTeamNamesMap() map[model.Role][]string {
 	return util.GetRoleTeamNamesMap(g.agents)
 }
 
-// AgentViews returns read-only projections of this game's agents, safe to hand
-// to the orchestration/API layer.
 func (g *Game) AgentViews() []model.AgentView {
 	return model.ViewsOf(g.agents)
 }

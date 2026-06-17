@@ -6,9 +6,8 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 )
 
-// NoopObserver implements GameObserver with empty methods. Embed it in an
-// adapter to inherit no-op defaults for the events it does not handle, and use
-// it as the default observer so Game never holds a nil sink.
+// 必要なイベントだけ実装すればよいよう空実装を埋め込み用に提供する。
+// 既定のobserverとしても使い、Gameが常に非nilのsinkを持てるようにする。
 type NoopObserver struct{}
 
 func (NoopObserver) OnGameStart(string, []model.AgentView)                         {}

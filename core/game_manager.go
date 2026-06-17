@@ -11,18 +11,16 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 )
 
-// GameManager owns the lifecycle of games: the waiting room, the optional match
-// optimizer, and the registry of running games. It contains the matchmaking
-// logic that used to live inline in the WebSocket handler, and it exposes
-// read-only snapshots for the API layer. Games are removed from the registry
-// when they finish, so the registry reflects only active games.
+// 待機部屋・マッチオプティマイザ・進行中ゲームの登録簿を持ち、マッチングとゲームの
+// 生成・破棄を担う。終了したゲームは登録簿から取り除かれるため、登録簿は実行中の
+// ゲームのみを表す。
 type GameManager struct {
 	config          model.Config
 	gameSetting     *model.Setting
 	waitingRoom     *WaitingRoom
-	matchOptimizer  *MatchOptimizer // nil unless matching optimization is enabled
+	matchOptimizer  *MatchOptimizer
 	observerFactory func() observer.GameObserver
-	games           sync.Map // game id -> *gameEntry
+	games           sync.Map
 	shuttingDown    atomic.Bool
 }
 
@@ -42,8 +40,6 @@ func (e *gameEntry) snapshot() model.GameSnapshot {
 	}
 }
 
-// NewGameManager builds a GameManager. observerFactory produces a fresh
-// composite observer for each game (so each game gets its own sinks wired).
 func NewGameManager(config model.Config, gameSetting *model.Setting, waitingRoom *WaitingRoom, matchOptimizer *MatchOptimizer, observerFactory func() observer.GameObserver) *GameManager {
 	return &GameManager{
 		config:          config,
@@ -54,9 +50,7 @@ func NewGameManager(config model.Config, gameSetting *model.Setting, waitingRoom
 	}
 }
 
-// TryStartGame registers a newly connected client and, if a match can be
-// formed, creates and starts a game. The matchmaking trigger semantics are
-// unchanged from the original inline implementation; only their location moved.
+// 接続を待機部屋へ追加し、マッチが成立すればゲームを生成して開始する。
 func (m *GameManager) TryStartGame(conn model.Connection) {
 	m.waitingRoom.AddConnection(conn.TeamName, conn)
 
@@ -99,13 +93,11 @@ func (m *GameManager) TryStartGame(conn model.Connection) {
 				m.matchOptimizer.setMatchWeight(game.GetRoleTeamNamesMap(), 0)
 			}
 		}
-		// Remove the finished game from the registry; without this the map would
-		// grow unbounded for the lifetime of the process.
+		// 終了したゲームを登録簿から取り除く。これがないとプロセス終了まで残り続ける。
 		m.games.Delete(game.GetID())
 	}()
 }
 
-// ActiveCount returns the number of games currently in the registry.
 func (m *GameManager) ActiveCount() int {
 	count := 0
 	m.games.Range(func(_, _ any) bool {
@@ -115,7 +107,6 @@ func (m *GameManager) ActiveCount() int {
 	return count
 }
 
-// ListGames returns a read-only snapshot of every active game.
 func (m *GameManager) ListGames() []model.GameSnapshot {
 	snapshots := make([]model.GameSnapshot, 0)
 	m.games.Range(func(_, value any) bool {
@@ -125,7 +116,6 @@ func (m *GameManager) ListGames() []model.GameSnapshot {
 	return snapshots
 }
 
-// GetGame returns a read-only snapshot of the game with the given id.
 func (m *GameManager) GetGame(id string) (model.GameSnapshot, bool) {
 	value, ok := m.games.Load(id)
 	if !ok {
@@ -134,19 +124,15 @@ func (m *GameManager) GetGame(id string) (model.GameSnapshot, bool) {
 	return value.(*gameEntry).snapshot(), true
 }
 
-// BeginShutdown marks the manager as draining so no new games are accepted.
 func (m *GameManager) BeginShutdown() {
 	m.shuttingDown.Store(true)
 }
 
-// IsShuttingDown reports whether the manager is draining.
 func (m *GameManager) IsShuttingDown() bool {
 	return m.shuttingDown.Load()
 }
 
-// WaitAllFinished blocks until every active game has finished. Because finished
-// games remove themselves from the registry, this waits for the registry to
-// drain to empty.
+// 終了したゲームは自ら登録簿から抜けるため、登録簿が空になるまで待つ。
 func (m *GameManager) WaitAllFinished() {
 	for m.ActiveCount() > 0 {
 		time.Sleep(15 * time.Second)

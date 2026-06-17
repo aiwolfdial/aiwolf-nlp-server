@@ -5,13 +5,11 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 )
 
-// realtimeBroadcasterObserver adapts RealtimeBroadcaster to observer.GameObserver.
 type realtimeBroadcasterObserver struct {
 	observer.NoopObserver
 	b *RealtimeBroadcaster
 }
 
-// AsObserver returns the RealtimeBroadcaster as a GameObserver.
 func (rb *RealtimeBroadcaster) AsObserver() observer.GameObserver {
 	return realtimeBroadcasterObserver{b: rb}
 }

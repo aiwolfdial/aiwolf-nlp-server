@@ -1,8 +1,6 @@
 package model
 
-// RulesetInfo summarises the single ruleset this server process is running.
-// The server runs exactly one config per process, so this reports the active
-// rules rather than enumerating configs on disk.
+// このプロセスが実行中のルール。サーバは1プロセス1設定で動くため一覧ではなく単一を表す。
 type RulesetInfo struct {
 	AgentCount     int            `json:"agent_count"`
 	MaxDay         int            `json:"max_day"`
@@ -12,7 +10,6 @@ type RulesetInfo struct {
 	Roles          map[string]int `json:"roles"`
 }
 
-// RulesetInfo builds a read-only summary of the active ruleset from the config.
 func (c Config) RulesetInfo() RulesetInfo {
 	info := RulesetInfo{
 		AgentCount:     c.Game.AgentCount,

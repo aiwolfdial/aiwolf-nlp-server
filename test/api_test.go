@@ -13,9 +13,6 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 )
 
-// TestAPIGameSnapshotAndStream exercises the read-only REST API and the SSE live
-// stream against a real running game: it confirms the game is listed while it
-// runs and that broadcast events are delivered over /api/v1/games/:id/events.
 func TestAPIGameSnapshotAndStream(t *testing.T) {
 	config, err := model.LoadFromPath("./config/talk.yml")
 	if err != nil {
@@ -64,7 +61,7 @@ func TestAPIGameSnapshotAndStream(t *testing.T) {
 			return "", nil
 		},
 		model.R_TALK: func(tc TestClient) (string, error) {
-			// Slow the talk phase slightly so the probe has time to connect.
+			// プローブが接続する余裕を作るためトークを少し遅らせる。
 			time.Sleep(30 * time.Millisecond)
 			return "hello", nil
 		},

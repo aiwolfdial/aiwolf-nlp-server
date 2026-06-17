@@ -66,8 +66,6 @@ func NewServer(config model.Config) (*Server, error) {
 	return server, nil
 }
 
-// newObserver builds a fresh composite observer wiring every enabled sink. It is
-// passed to the GameManager and invoked once per game.
 func (s *Server) newObserver() observer.GameObserver {
 	var observers []observer.GameObserver
 	if s.jsonLogger != nil {

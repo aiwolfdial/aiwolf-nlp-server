@@ -239,8 +239,7 @@ func (g *Game) GetID() string {
 	return g.id
 }
 
-// SetObserver sets the observer that receives this game's events. A nil
-// observer is replaced with a no-op so the game never holds a nil sink.
+// nilのときはNoopに差し替え、Gameが常に非nilのobserverを保つ。
 func (g *Game) SetObserver(o observer.GameObserver) {
 	if o == nil {
 		o = observer.NoopObserver{}

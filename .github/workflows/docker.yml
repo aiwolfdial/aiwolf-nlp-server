@@ -32,8 +32,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
-      # On PRs/branches this only validates that the image builds. On tags it
-      # builds and pushes to GHCR with the same version ldflags as the binaries.
+      # PR/ブランチではビルド可否の検証のみ。タグ時はバイナリと同じldflagsでGHCRへpushする。
       - name: Build and push
         uses: docker/build-push-action@v6
         with:

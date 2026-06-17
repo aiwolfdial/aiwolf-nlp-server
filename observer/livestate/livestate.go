@@ -1,6 +1,3 @@
-// Package livestate provides an in-memory GameObserver that tracks the current
-// state of each running game and lets HTTP clients subscribe to a live stream of
-// broadcast events (e.g. over SSE), without polling files.
 package livestate
 
 import (
@@ -10,14 +7,10 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 )
 
-// subscriberBuffer bounds how many pending events a slow subscriber may hold
-// before the oldest is dropped. Dropping (rather than blocking) guarantees the
-// game goroutine is never stalled by a slow HTTP client.
 const subscriberBuffer = 64
 
-// LiveState is a GameObserver that keeps the latest snapshot of each game and
-// fans broadcast events out to subscribers. It embeds NoopObserver so it only
-// implements the events it needs.
+// 各ゲームの現在状態を保持し、ブロードキャストを購読者へ配信するobserver。
+// SSE等のpush配信をファイルポーリングなしで実現する。
 type LiveState struct {
 	observer.NoopObserver
 	mu    sync.Mutex
@@ -33,7 +26,6 @@ type gameState struct {
 	nextSubID   int
 }
 
-// New returns an empty LiveState.
 func New() *LiveState {
 	return &LiveState{games: make(map[string]*gameState)}
 }
@@ -60,8 +52,7 @@ func (l *LiveState) OnBroadcast(packet model.BroadcastPacket) {
 		select {
 		case ch <- packet:
 		default:
-			// Subscriber is behind: drop its oldest event and try again so we
-			// never block the game goroutine.
+			// 満杯なら最古を捨てて再投入する。ゲームのgoroutineを遅い購読者でブロックさせない。
 			select {
 			case <-ch:
 			default:
@@ -90,10 +81,8 @@ func (l *LiveState) OnGameEnd(id string, winSide model.Team) {
 	delete(l.games, id)
 }
 
-// Subscribe registers a subscriber for the game's broadcast stream. It returns a
-// receive-only channel, a cancel func to unsubscribe, and whether the game
-// exists. The channel is closed when the game ends. The most recent packet (if
-// any) is delivered immediately so a late subscriber sees current state.
+// 購読チャネルとその解除関数を返す。チャネルはゲーム終了時にcloseされる。
+// 直近のパケットがあれば即座に配信し、遅れて参加した購読者にも現在状態を見せる。
 func (l *LiveState) Subscribe(id string) (<-chan model.BroadcastPacket, func(), bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -124,8 +113,7 @@ func (l *LiveState) Subscribe(id string) (<-chan model.BroadcastPacket, func(), 
 	return ch, cancel, true
 }
 
-// Snapshot returns the current state of a game, derived from the latest
-// broadcast. All collections are copies.
+// 直近のブロードキャストから現在状態のコピーを組み立てて返す。
 func (l *LiveState) Snapshot(id string) (model.GameSnapshot, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()

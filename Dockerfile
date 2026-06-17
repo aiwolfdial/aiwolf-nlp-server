@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-# Version metadata is injected the same way the release workflow does it.
+# バージョン情報はリリースワークフローと同じ方法で埋め込む。
 ARG VERSION=docker
 ARG REVISION=unknown
 ARG BUILD=docker
@@ -16,13 +16,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /out/aiwolf-nlp-server .
 
 # ---- runtime stage ----
-# distroless/static is the smallest possible base for a CGO-free static binary.
-# TTS (ffmpeg/VOICEVOX) is intentionally excluded to keep the image slim; run
-# VOICEVOX as a separate container and point AIWOLF_TTS_HOST at it.
+# CGO無効の静的バイナリ向けに最小の distroless/static を使う。
+# イメージを軽量に保つためTTS（ffmpeg/VOICEVOX）は含めない。VOICEVOXは別コンテナで動かし
+# AIWOLF_TTS_HOST で接続する。
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /out/aiwolf-nlp-server /aiwolf-nlp-server
-# Bundle the default game configs so the image runs out of the box; mount a
-# volume over /config to override them.
+# 既定の設定を同梱して単体で起動できるようにする。/config をマウントすれば上書き可能。
 COPY --from=build /src/config/*.yml /config/
 
 EXPOSE 8080

@@ -10,9 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// buildRouter wires the HTTP surface: CORS, the agent WebSocket endpoint, the
-// static realtime/TTS file servers, and the versioned REST API. It is the single
-// place that defines the server's routes.
 func (s *Server) buildRouter() *gin.Engine {
 	router := gin.Default()
 	router.Use(func(c *gin.Context) {
@@ -51,9 +48,7 @@ func (s *Server) buildRouter() *gin.Engine {
 	return router
 }
 
-// receiverAuthMiddleware validates a RECEIVER JWT from the token query param or
-// the Authorization bearer header. It is shared by the realtime file server and
-// the REST API so authentication is defined in one place.
+// /realtime と REST API で共用する RECEIVER トークン検証。
 func receiverAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Query("token")

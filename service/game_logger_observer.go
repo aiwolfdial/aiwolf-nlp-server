@@ -5,13 +5,11 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 )
 
-// gameLoggerObserver adapts GameLogger to the observer.GameObserver interface.
 type gameLoggerObserver struct {
 	observer.NoopObserver
 	l *GameLogger
 }
 
-// AsObserver returns the GameLogger as a GameObserver.
 func (g *GameLogger) AsObserver() observer.GameObserver {
 	return gameLoggerObserver{l: g}
 }

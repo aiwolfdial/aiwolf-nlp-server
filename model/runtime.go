@@ -6,16 +6,9 @@ import (
 	"strconv"
 )
 
-// ApplyEnvOverrides applies server/runtime-level overrides from environment
-// variables on top of a loaded config. It only touches deployment-level fields
-// (host/port, auth, output directories, external service hosts) and never the
-// per-game ruleset, so existing config files keep working unchanged. When no
-// environment variables are set this is a no-op, preserving current behaviour.
-//
-// This is the primary mechanism for configuring the server in a container,
-// where host/port and output directories must come from the environment rather
-// than being baked into a YAML file. The JWT SECRET_KEY is read directly from
-// the environment elsewhere and is intentionally not duplicated here.
+// 環境変数でサーバ/ランタイム設定を上書きする。コンテナ実行で設定ファイルを編集せずに
+// host/portや出力先を差し替えるための仕組み。未設定の変数は無視するため、未設定時は
+// 設定ファイルの値がそのまま使われる。ゲームのルールは対象外。
 func (c *Config) ApplyEnvOverrides() {
 	if v := os.Getenv("AIWOLF_HOST"); v != "" {
 		c.Server.WebSocket.Host = v
@@ -47,8 +40,7 @@ func (c *Config) ApplyEnvOverrides() {
 	}
 }
 
-// lookupBool reads a boolean-ish env var, returning (value, true) when the
-// variable is set to a recognised value and (false, false) when it is unset.
+// 未設定なら(false, false)を返し、設定済みのときのみ第2戻り値をtrueにする。
 func lookupBool(key string) (bool, bool) {
 	v, ok := os.LookupEnv(key)
 	if !ok || v == "" {

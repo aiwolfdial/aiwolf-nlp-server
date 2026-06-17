@@ -2,10 +2,8 @@ package model
 
 import "time"
 
-// AgentView is a read-only, value-type projection of an Agent. It exposes only
-// safe scalar fields and never the live websocket Connection or the message
-// channel, so observers and API consumers cannot reach or mutate game state
-// through it.
+// observerやAPIへ渡す唯一のエージェント表現。生のConnection/msgChanを含めない値型とし、
+// 外部から内部状態へ到達・変更できないようにする。
 type AgentView struct {
 	Idx          int    `json:"idx"`
 	TeamName     string `json:"team_name"`
@@ -19,8 +17,7 @@ func (a AgentView) String() string {
 	return a.GameName
 }
 
-// View returns a read-only projection of the agent. Alive defaults to true;
-// callers that know the agent's status set it explicitly.
+// Aliveはtrue既定。生存状況を知る呼び出し側が必要に応じて設定する。
 func (a *Agent) View() AgentView {
 	return AgentView{
 		Idx:          a.Idx,
@@ -32,7 +29,6 @@ func (a *Agent) View() AgentView {
 	}
 }
 
-// ViewsOf converts a slice of agents into read-only views.
 func ViewsOf(agents []*Agent) []AgentView {
 	views := make([]AgentView, 0, len(agents))
 	for _, a := range agents {
@@ -41,21 +37,17 @@ func ViewsOf(agents []*Agent) []AgentView {
 	return views
 }
 
-// GameSnapshot is a read-only, value-type summary of a game's state, handed out
-// by the orchestration/API layer. All collections are copies, so consumers
-// cannot reach or mutate live game state.
+// GameManager/APIが返す値型のスナップショット。内部のmap/sliceは複製して渡す。
 type GameSnapshot struct {
 	ID            string         `json:"id"`
 	Day           int            `json:"day"`
 	Finished      bool           `json:"finished"`
 	WinSide       Team           `json:"win_side"`
 	Agents        []AgentView    `json:"agents"`
-	StatusByAgent map[int]string `json:"status_by_agent"` // agent idx -> status (ALIVE/DEAD)
+	StatusByAgent map[int]string `json:"status_by_agent"`
 }
 
-// TalkView is a read-only projection of a Talk. Unlike Talk, it does not embed a
-// full Agent (which would leak the live Connection and message channel); it
-// carries an AgentView instead.
+// TalkはAgentを値で内包しConnection/msgChanを露出するため、observerへはこのビューを渡す。
 type TalkView struct {
 	Idx   int
 	Day   int
@@ -65,7 +57,6 @@ type TalkView struct {
 	Time  time.Time
 }
 
-// View returns a read-only projection of the talk.
 func (t Talk) View() TalkView {
 	return TalkView{
 		Idx:   t.Idx,

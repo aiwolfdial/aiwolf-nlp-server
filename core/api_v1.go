@@ -7,20 +7,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// registerAPI mounts the versioned REST API under /api/v1. Endpoints are
-// read-only in this pass: liveness/readiness probes for orchestration and
-// read-only views of running games backed by the GameManager. Mutating
-// endpoints (start/stop a game, push config) are intentionally deferred.
+// /api/v1 配下の読み取り専用API。ゲームの開始/停止や設定投入といった更新系は持たない。
 func (s *Server) registerAPI(router *gin.Engine) {
 	api := router.Group("/api/v1")
 
-	// Liveness: always 200 while the process is up. Unauthenticated so container
-	// orchestration can probe it.
+	// オーケストレーションのプローブ用に無認証で公開する。
 	api.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "version": Version.Version})
 	})
 
-	// Readiness: 503 while draining so a load balancer stops sending new traffic.
 	api.GET("/readyz", func(c *gin.Context) {
 		if s.manager.IsShuttingDown() {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "draining"})
@@ -29,8 +24,6 @@ func (s *Server) registerAPI(router *gin.Engine) {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
 
-	// The ruleset this process is running. The server runs one config per
-	// process, so this reports the active rules (not a catalog of files).
 	api.GET("/ruleset", func(c *gin.Context) {
 		c.JSON(http.StatusOK, s.config.RulesetInfo())
 	})
@@ -44,8 +37,7 @@ func (s *Server) registerAPI(router *gin.Engine) {
 	})
 	games.GET("/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		// Prefer the live in-memory snapshot (it carries day and per-agent
-		// status); fall back to the manager's basic registry snapshot.
+		// 日付や生存状況を持つライブ状態を優先し、無ければ登録簿の基本情報にフォールバックする。
 		if s.liveState != nil {
 			if snap, ok := s.liveState.Snapshot(id); ok {
 				c.JSON(http.StatusOK, snap)
@@ -59,9 +51,7 @@ func (s *Server) registerAPI(router *gin.Engine) {
 		}
 		c.JSON(http.StatusOK, snap)
 	})
-	// Server-Sent Events stream of a game's broadcast events, replacing
-	// file-polling for live spectators. The existing /realtime static files
-	// remain for the legacy viewer.
+	// ファイルポーリングに代わるリアルタイム配信（SSE）。既存の /realtime 静的配信は残す。
 	games.GET("/:id/events", func(c *gin.Context) {
 		if s.liveState == nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "live state unavailable"})

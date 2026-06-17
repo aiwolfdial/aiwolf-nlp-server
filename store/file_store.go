@@ -5,14 +5,10 @@ import (
 	"path/filepath"
 )
 
-// FileMatchOptimizerStore persists match-optimizer state to a single JSON file.
-// It reproduces the exact on-disk behaviour the optimizer used before the store
-// abstraction was introduced.
 type FileMatchOptimizerStore struct {
 	path string
 }
 
-// NewFileMatchOptimizerStore returns a store backed by the file at path.
 func NewFileMatchOptimizerStore(path string) *FileMatchOptimizerStore {
 	return &FileMatchOptimizerStore{path: path}
 }

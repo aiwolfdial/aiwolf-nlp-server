@@ -24,9 +24,8 @@ func NewWaitingRoom(config model.Config) *WaitingRoom {
 }
 
 func (wr *WaitingRoom) AddConnection(team string, connection model.Connection) {
-	// The per-team value is a slice; appending is a read-modify-write that must
-	// be serialized so concurrent connections (e.g. same-team self-match) don't
-	// race on the backing array or lose entries.
+	// チーム毎の値はスライスで、追加は読み書きを伴う。同一チームの同時接続（自己対戦など）で
+	// 背後の配列を競合させたり要素を取りこぼさないよう直列化する。
 	wr.mu.Lock()
 	value, _ := wr.connections.LoadOrStore(team, []model.Connection{})
 	connections := value.([]model.Connection)
