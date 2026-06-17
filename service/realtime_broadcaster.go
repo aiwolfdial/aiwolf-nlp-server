@@ -24,6 +24,7 @@ type RealtimeBroadcasterLog struct {
 	filename  string
 	agents    []any
 	logs      []string
+	packetIdx int
 	logsMu    sync.Mutex
 	updatedAt time.Time
 }
@@ -90,28 +91,47 @@ func (rb *RealtimeBroadcaster) TrackEndGame(id string) {
 	}
 }
 
-func (rb *RealtimeBroadcaster) Broadcast(packet model.BroadcastPacket) {
+// Emit はゲーム状態スナップショットとイベント固有の情報からパケットを組み立てて配信する。
+// パケットのidxはゲーム単位で連番。
+func (rb *RealtimeBroadcaster) Emit(id string, state model.GameState, event string, message *string, fromIdx *int, toIdx *int, bubbleIdx *int) {
+	gameLogInterface, exists := rb.data.Load(id)
+	if !exists {
+		return
+	}
+	gameLog := gameLogInterface.(*RealtimeBroadcasterLog)
+
+	gameLog.logsMu.Lock()
+	gameLog.packetIdx++
+	packet := model.BroadcastPacket{
+		Id:        id,
+		Idx:       gameLog.packetIdx,
+		Day:       state.Day,
+		IsDay:     state.IsDaytime,
+		Agents:    state.Agents,
+		Event:     event,
+		Message:   message,
+		FromIdx:   fromIdx,
+		ToIdx:     toIdx,
+		BubbleIdx: bubbleIdx,
+		Timestamp: time.Now().Unix(),
+	}
 	data, err := json.Marshal(packet)
 	if err != nil {
+		gameLog.logsMu.Unlock()
 		slog.Error("パケットのJSON化に失敗しました", "error", err)
 		return
 	}
+	// 毎パケットでの全書き換え（パケット数に対しO(n^2)）を避け、新規行のみ追記する。
+	// 結果のファイルは従来と同一（"\n"区切り）。1ゲームの書き込みは所有goroutineで直列。
+	firstLine := len(gameLog.logs) == 0
+	gameLog.logs = append(gameLog.logs, string(data))
+	gameLog.updatedAt = time.Now()
+	filename := gameLog.filename
+	gameLog.logsMu.Unlock()
 
-	if gameLogInterface, exists := rb.data.Load(packet.Id); exists {
-		gameLog := gameLogInterface.(*RealtimeBroadcasterLog)
-		gameLog.logsMu.Lock()
-		// 毎パケットでの全書き換え（パケット数に対しO(n^2)）を避け、新規行のみ追記する。
-		// 結果のファイルは従来と同一（"\n"区切り）。1ゲームの書き込みは所有goroutineで直列。
-		firstLine := len(gameLog.logs) == 0
-		gameLog.logs = append(gameLog.logs, string(data))
-		gameLog.updatedAt = time.Now()
-		filename := gameLog.filename
-		gameLog.logsMu.Unlock()
-
-		rb.appendGameFileLine(filename, string(data), firstLine)
-		rb.writeGamesListFile()
-		slog.Info("JSONLファイルにブロードキャストを保存しました", "game_id", packet.Id)
-	}
+	rb.appendGameFileLine(filename, string(data), firstLine)
+	rb.writeGamesListFile()
+	slog.Info("JSONLファイルにブロードキャストを保存しました", "game_id", id)
 }
 
 func (rb *RealtimeBroadcaster) appendGameFileLine(filename string, line string, firstLine bool) {

@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
@@ -36,26 +35,15 @@ func (g *Game) doAttack() {
 		if attacked != nil && !g.isGuarded(attacked) {
 			g.getCurrentGameStatus().StatusMap[*attacked] = model.S_DEAD
 			g.getCurrentGameStatus().AttackedAgent = attacked
-			g.obs.OnLogLine(g.id, fmt.Sprintf("%d,attack,%d,true", g.currentDay, attacked.Idx))
-			packet := g.getRealtimeBroadcastPacket()
-			packet.Event = "襲撃"
-			packet.ToIdx = &attacked.Idx
-			g.obs.OnBroadcast(packet)
+			view := attacked.View()
+			g.obs.OnAttack(g.id, g.currentDay, &view, false, g.gameState())
 			slog.Info("襲撃結果を設定しました", "id", g.id, "agent", attacked.String())
 		} else if attacked != nil {
-			g.obs.OnLogLine(g.id, fmt.Sprintf("%d,attack,%d,false", g.currentDay, attacked.Idx))
-			packet := g.getRealtimeBroadcastPacket()
-			packet.Event = "襲撃"
-			idx := -1
-			packet.FromIdx = &idx
-			packet.ToIdx = &attacked.Idx
-			g.obs.OnBroadcast(packet)
+			view := attacked.View()
+			g.obs.OnAttack(g.id, g.currentDay, &view, true, g.gameState())
 			slog.Info("護衛されたため、襲撃結果を設定しません", "id", g.id, "agent", attacked.String())
 		} else {
-			g.obs.OnLogLine(g.id, fmt.Sprintf("%d,attack,-1,true", g.currentDay))
-			packet := g.getRealtimeBroadcastPacket()
-			packet.Event = "襲撃"
-			g.obs.OnBroadcast(packet)
+			g.obs.OnAttack(g.id, g.currentDay, nil, false, g.gameState())
 			slog.Info("襲撃対象がいないため、襲撃結果を設定しません", "id", g.id)
 		}
 	}

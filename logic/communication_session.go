@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -255,21 +254,10 @@ func (s *CommunicationSession) appendTalk(talk model.Talk) {
 }
 
 func (s *CommunicationSession) logTalk(talk model.Talk) {
-	kind := "talk"
-	if s.request != model.R_TALK {
-		kind = "whisper"
-	}
-	s.game.obs.OnLogLine(s.game.id, fmt.Sprintf("%d,%s,%d,%d,%d,%s,%d", s.game.currentDay, kind, talk.Idx, talk.Turn, talk.Agent.Idx, talk.Text, talk.Time.Unix()))
-	packet := s.game.getRealtimeBroadcastPacket()
-	if s.request == model.R_TALK {
-		packet.Event = "トーク"
-	} else {
-		packet.Event = "囁き"
-	}
-	packet.Message = &talk.Text
-	packet.BubbleIdx = &talk.Agent.Idx
-	s.game.obs.OnBroadcast(packet)
+	var voiceID *int
 	if talk.Agent.Profile != nil {
-		s.game.obs.OnSpeak(s.game.id, talk.Text, talk.Agent.Profile.VoiceID)
+		v := talk.Agent.Profile.VoiceID
+		voiceID = &v
 	}
+	s.game.obs.OnTalk(s.game.id, s.game.currentDay, s.request, talk.View(), voiceID, s.game.gameState())
 }

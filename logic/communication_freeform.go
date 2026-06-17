@@ -54,7 +54,7 @@ func (s *CommunicationSession) runFreeform() {
 					s.appendTalk(talk)
 					s.sendTalk(talk)
 					s.logTalk(talk)
-					s.game.obs.OnTalk(s.game.id, submission.Agent.View(), s.request, talk.View())
+					s.game.obs.OnFreeformTalk(s.game.id, submission.Agent.View(), s.request, talk.View())
 				}
 				if s.allAgentsDone() {
 					slog.Info("全エージェントの発言が終了したため、早期終了します", "id", s.game.id)

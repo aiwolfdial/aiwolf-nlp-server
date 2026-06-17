@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
@@ -37,11 +36,6 @@ func (g *Game) conductGuard(agent *model.Agent) {
 		Agent:  *agent,
 		Target: *target,
 	}
-	g.obs.OnLogLine(g.id, fmt.Sprintf("%d,guard,%d,%d,%s", g.currentDay, agent.Idx, target.Idx, target.Role.Name))
-	packet := g.getRealtimeBroadcastPacket()
-	packet.Event = "護衛"
-	packet.FromIdx = &agent.Idx
-	packet.ToIdx = &target.Idx
-	g.obs.OnBroadcast(packet)
+	g.obs.OnGuard(g.id, g.currentDay, agent.View(), target.View(), g.gameState())
 	slog.Info("護衛対象を設定しました", "id", g.id, "target", target.String())
 }

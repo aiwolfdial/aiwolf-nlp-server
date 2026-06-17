@@ -2,6 +2,7 @@ package livestate
 
 import (
 	"sync"
+	"time"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
@@ -10,9 +11,9 @@ import (
 const subscriberBuffer = 64
 
 // 各ゲームの現在状態を保持し、ブロードキャストを購読者へ配信するobserver。
-// SSE等のpush配信をファイルポーリングなしで実現する。
+// イベント→パケットの変換は observer.Broadcaster を埋め込んで共有する。
 type LiveState struct {
-	observer.NoopObserver
+	observer.Broadcaster
 	mu    sync.Mutex
 	games map[string]*gameState
 }
@@ -21,33 +22,67 @@ type gameState struct {
 	agents      []model.AgentView
 	finished    bool
 	winSide     model.Team
+	packetIdx   int
 	lastPacket  *model.BroadcastPacket
 	subscribers map[int]chan model.BroadcastPacket
 	nextSubID   int
 }
 
 func New() *LiveState {
-	return &LiveState{games: make(map[string]*gameState)}
+	l := &LiveState{games: make(map[string]*gameState)}
+	l.Broadcaster.Emit = l.emit
+	return l
 }
 
-func (l *LiveState) OnGameStart(id string, agents []model.AgentView) {
+func (l *LiveState) OnGameStart(id string, agents []model.AgentView, state model.GameState) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
 	l.games[id] = &gameState{
 		agents:      append([]model.AgentView(nil), agents...),
 		subscribers: make(map[int]chan model.BroadcastPacket),
 	}
+	l.mu.Unlock()
+	l.Broadcaster.OnGameStart(id, agents, state)
 }
 
-func (l *LiveState) OnBroadcast(packet model.BroadcastPacket) {
+func (l *LiveState) OnGameEnd(id string, winSide model.Team, state model.GameState) {
+	l.Broadcaster.OnGameEnd(id, winSide, state)
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	gs := l.games[packet.Id]
+	gs := l.games[id]
 	if gs == nil {
 		return
 	}
-	p := packet
-	gs.lastPacket = &p
+	gs.finished = true
+	gs.winSide = winSide
+	for _, ch := range gs.subscribers {
+		close(ch)
+	}
+	gs.subscribers = nil
+	delete(l.games, id)
+}
+
+func (l *LiveState) emit(id string, state model.GameState, event string, message *string, fromIdx *int, toIdx *int, bubbleIdx *int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	gs := l.games[id]
+	if gs == nil {
+		return
+	}
+	gs.packetIdx++
+	packet := model.BroadcastPacket{
+		Id:        id,
+		Idx:       gs.packetIdx,
+		Day:       state.Day,
+		IsDay:     state.IsDaytime,
+		Agents:    state.Agents,
+		Event:     event,
+		Message:   message,
+		FromIdx:   fromIdx,
+		ToIdx:     toIdx,
+		BubbleIdx: bubbleIdx,
+		Timestamp: time.Now().Unix(),
+	}
+	gs.lastPacket = &packet
 	for _, ch := range gs.subscribers {
 		select {
 		case ch <- packet:
@@ -63,22 +98,6 @@ func (l *LiveState) OnBroadcast(packet model.BroadcastPacket) {
 			}
 		}
 	}
-}
-
-func (l *LiveState) OnGameEnd(id string, winSide model.Team) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	gs := l.games[id]
-	if gs == nil {
-		return
-	}
-	gs.finished = true
-	gs.winSide = winSide
-	for _, ch := range gs.subscribers {
-		close(ch)
-	}
-	gs.subscribers = nil
-	delete(l.games, id)
 }
 
 // 購読チャネルとその解除関数を返す。チャネルはゲーム終了時にcloseされる。

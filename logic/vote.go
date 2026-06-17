@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
@@ -43,23 +42,9 @@ func (g *Game) collectVotes(request model.Request, agents []*model.Agent) []mode
 			Target: *target,
 		})
 		if request == model.R_VOTE {
-			g.obs.OnLogLine(g.id, fmt.Sprintf("%d,vote,%d,%d", g.currentDay, agent.Idx, target.Idx))
+			g.obs.OnVote(g.id, g.currentDay, agent.View(), target.View(), g.gameState())
 		} else {
-			g.obs.OnLogLine(g.id, fmt.Sprintf("%d,attackVote,%d,%d", g.currentDay, agent.Idx, target.Idx))
-		}
-
-		if request == model.R_VOTE {
-			packet := g.getRealtimeBroadcastPacket()
-			packet.Event = "投票"
-			packet.FromIdx = &agent.Idx
-			packet.ToIdx = &target.Idx
-			g.obs.OnBroadcast(packet)
-		} else {
-			packet := g.getRealtimeBroadcastPacket()
-			packet.Event = "襲撃投票"
-			packet.FromIdx = &agent.Idx
-			packet.ToIdx = &target.Idx
-			g.obs.OnBroadcast(packet)
+			g.obs.OnAttackVote(g.id, g.currentDay, agent.View(), target.View(), g.gameState())
 		}
 		slog.Info("投票を受信しました", "id", g.id, "agent", agent.String(), "target", target.String())
 	}

@@ -6,22 +6,22 @@ import (
 )
 
 type realtimeBroadcasterObserver struct {
-	observer.NoopObserver
+	observer.Broadcaster
 	b *RealtimeBroadcaster
 }
 
 func (rb *RealtimeBroadcaster) AsObserver() observer.GameObserver {
-	return realtimeBroadcasterObserver{b: rb}
+	o := realtimeBroadcasterObserver{b: rb}
+	o.Broadcaster.Emit = rb.Emit
+	return o
 }
 
-func (o realtimeBroadcasterObserver) OnGameStart(id string, agents []model.AgentView) {
+func (o realtimeBroadcasterObserver) OnGameStart(id string, agents []model.AgentView, state model.GameState) {
 	o.b.TrackStartGame(id, agents)
+	o.Broadcaster.OnGameStart(id, agents, state)
 }
 
-func (o realtimeBroadcasterObserver) OnGameEnd(id string, _ model.Team) {
+func (o realtimeBroadcasterObserver) OnGameEnd(id string, winSide model.Team, state model.GameState) {
+	o.Broadcaster.OnGameEnd(id, winSide, state)
 	o.b.TrackEndGame(id)
-}
-
-func (o realtimeBroadcasterObserver) OnBroadcast(packet model.BroadcastPacket) {
-	o.b.Broadcast(packet)
 }

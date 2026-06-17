@@ -21,15 +21,45 @@ func NewComposite(observers ...GameObserver) *Composite {
 	return &Composite{observers: filtered}
 }
 
-func (c *Composite) OnGameStart(id string, agents []model.AgentView) {
+func (c *Composite) OnGameStart(id string, agents []model.AgentView, state model.GameState) {
 	for _, o := range c.observers {
-		o.OnGameStart(id, agents)
+		o.OnGameStart(id, agents, state)
 	}
 }
 
-func (c *Composite) OnGameEnd(id string, winSide model.Team) {
+func (c *Composite) OnGameEnd(id string, winSide model.Team, state model.GameState) {
 	for _, o := range c.observers {
-		o.OnGameEnd(id, winSide)
+		o.OnGameEnd(id, winSide, state)
+	}
+}
+
+func (c *Composite) OnDayStatus(id string, day int, statuses []model.AgentStatus) {
+	for _, o := range c.observers {
+		o.OnDayStatus(id, day, statuses)
+	}
+}
+
+func (c *Composite) OnResult(id string, day int, villagers int, werewolves int, winSide model.Team) {
+	for _, o := range c.observers {
+		o.OnResult(id, day, villagers, werewolves, winSide)
+	}
+}
+
+func (c *Composite) OnTalk(id string, day int, request model.Request, talk model.TalkView, voiceID *int, state model.GameState) {
+	for _, o := range c.observers {
+		o.OnTalk(id, day, request, talk, voiceID, state)
+	}
+}
+
+func (c *Composite) OnFreeformTalk(id string, agent model.AgentView, request model.Request, talk model.TalkView) {
+	for _, o := range c.observers {
+		o.OnFreeformTalk(id, agent, request, talk)
+	}
+}
+
+func (c *Composite) OnPhase(id string, request model.Request) {
+	for _, o := range c.observers {
+		o.OnPhase(id, request)
 	}
 }
 
@@ -45,38 +75,38 @@ func (c *Composite) OnResponse(id string, agent model.AgentView, response string
 	}
 }
 
-func (c *Composite) OnTalk(id string, agent model.AgentView, request model.Request, talk model.TalkView) {
+func (c *Composite) OnVote(id string, day int, agent model.AgentView, target model.AgentView, state model.GameState) {
 	for _, o := range c.observers {
-		o.OnTalk(id, agent, request, talk)
+		o.OnVote(id, day, agent, target, state)
 	}
 }
 
-func (c *Composite) OnPhase(id string, request model.Request) {
+func (c *Composite) OnAttackVote(id string, day int, agent model.AgentView, target model.AgentView, state model.GameState) {
 	for _, o := range c.observers {
-		o.OnPhase(id, request)
+		o.OnAttackVote(id, day, agent, target, state)
 	}
 }
 
-func (c *Composite) OnLogLine(id string, line string) {
+func (c *Composite) OnExecute(id string, day int, executed *model.AgentView, state model.GameState) {
 	for _, o := range c.observers {
-		o.OnLogLine(id, line)
+		o.OnExecute(id, day, executed, state)
 	}
 }
 
-func (c *Composite) OnBroadcast(packet model.BroadcastPacket) {
+func (c *Composite) OnDivine(id string, day int, agent model.AgentView, target model.AgentView, state model.GameState) {
 	for _, o := range c.observers {
-		o.OnBroadcast(packet)
+		o.OnDivine(id, day, agent, target, state)
 	}
 }
 
-func (c *Composite) OnStreamCreate(id string) {
+func (c *Composite) OnGuard(id string, day int, agent model.AgentView, target model.AgentView, state model.GameState) {
 	for _, o := range c.observers {
-		o.OnStreamCreate(id)
+		o.OnGuard(id, day, agent, target, state)
 	}
 }
 
-func (c *Composite) OnSpeak(id string, text string, voiceID int) {
+func (c *Composite) OnAttack(id string, day int, attacked *model.AgentView, guarded bool, state model.GameState) {
 	for _, o := range c.observers {
-		o.OnSpeak(id, text, voiceID)
+		o.OnAttack(id, day, attacked, guarded, state)
 	}
 }

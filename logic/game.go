@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"log/slog"
 	"sync/atomic"
 
@@ -12,19 +11,18 @@ import (
 )
 
 type Game struct {
-	id                           string
-	agents                       []*model.Agent
-	winSide                      model.Team
-	isFinished                   atomic.Bool
-	ruleset                      model.RulesetView
-	setting                      model.SettingView
-	currentDay                   int
-	isDaytime                    bool
-	gameStatuses                 map[int]*model.GameStatus
-	lastTalkIdxMap               map[*model.Agent]int
-	lastWhisperIdxMap            map[*model.Agent]int
-	obs                          observer.GameObserver
-	realtimeBroadcasterPacketIdx int
+	id                string
+	agents            []*model.Agent
+	winSide           model.Team
+	isFinished        atomic.Bool
+	ruleset           model.RulesetView
+	setting           model.SettingView
+	currentDay        int
+	isDaytime         bool
+	gameStatuses      map[int]*model.GameStatus
+	lastTalkIdxMap    map[*model.Agent]int
+	lastWhisperIdxMap map[*model.Agent]int
+	obs               observer.GameObserver
 }
 
 func NewGame(config *model.Config, settings *model.Setting, conns []model.Connection) *Game {
@@ -103,14 +101,7 @@ func NewGameWithRole(config *model.Config, settings *model.Setting, roleMapConns
 
 func (g *Game) Start() model.Team {
 	slog.Info("ゲームを開始します", "id", g.id)
-	g.obs.OnGameStart(g.id, model.ViewsOf(g.agents))
-	g.obs.OnStreamCreate(g.id)
-	startPacket := g.getRealtimeBroadcastPacket()
-	startPacket.Event = "開始"
-	startMessage := "ゲームが開始されました"
-	startPacket.Message = &startMessage
-	g.obs.OnBroadcast(startPacket)
-	g.obs.OnSpeak(g.id, "ゲームが開始されました", 23)
+	g.obs.OnGameStart(g.id, model.ViewsOf(g.agents), g.gameState())
 	g.requestToEveryone(model.R_INITIALIZE)
 	for {
 		g.progressDay()
@@ -128,19 +119,11 @@ func (g *Game) Start() model.Team {
 		}
 	}
 	g.requestToEveryone(model.R_FINISH)
-	for _, agent := range g.agents {
-		g.obs.OnLogLine(g.id, fmt.Sprintf("%d,status,%d,%s,%s,%s,%s", g.currentDay, agent.Idx, agent.Role.Name, g.getCurrentGameStatus().StatusMap[*agent].String(), agent.OriginalName, agent.GameName))
-	}
+	g.obs.OnDayStatus(g.id, g.currentDay, g.agentStatuses())
 	villagers, werewolves := util.CountAliveTeams(g.getCurrentGameStatus().StatusMap)
-	g.obs.OnLogLine(g.id, fmt.Sprintf("%d,result,%d,%d,%s", g.currentDay, villagers, werewolves, g.winSide))
-	endPacket := g.getRealtimeBroadcastPacket()
-	endPacket.Event = "終了"
-	endMessage := string(g.winSide)
-	endPacket.Message = &endMessage
-	g.obs.OnBroadcast(endPacket)
-	g.obs.OnSpeak(g.id, "ゲームが終了しました", 23)
+	g.obs.OnResult(g.id, g.currentDay, villagers, werewolves, g.winSide)
 	g.closeAllAgents()
-	g.obs.OnGameEnd(g.id, g.winSide)
+	g.obs.OnGameEnd(g.id, g.winSide, g.gameState())
 	slog.Info("ゲームが終了しました", "id", g.id, "winSide", g.winSide)
 	g.isFinished.Store(true)
 	return g.winSide
@@ -163,9 +146,7 @@ func (g *Game) progressDay() {
 	slog.Info("昼セクションを開始します", "id", g.id, "day", g.currentDay)
 	g.isDaytime = true
 	g.requestToEveryone(model.R_DAILY_INITIALIZE)
-	for _, agent := range g.agents {
-		g.obs.OnLogLine(g.id, fmt.Sprintf("%d,status,%d,%s,%s,%s,%s", g.currentDay, agent.Idx, agent.Role.Name, g.getCurrentGameStatus().StatusMap[*agent].String(), agent.OriginalName, agent.GameName))
-	}
+	g.obs.OnDayStatus(g.id, g.currentDay, g.agentStatuses())
 
 	for _, phase := range g.ruleset.DayPhases() {
 		if phase.OnlyDay != nil && *phase.OnlyDay != g.currentDay {

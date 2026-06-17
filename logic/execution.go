@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
@@ -33,11 +32,8 @@ func (g *Game) doExecution() {
 	if executed != nil {
 		g.getCurrentGameStatus().StatusMap[*executed] = model.S_DEAD
 		g.getCurrentGameStatus().ExecutedAgent = executed
-		g.obs.OnLogLine(g.id, fmt.Sprintf("%d,execute,%d,%s", g.currentDay, executed.Idx, executed.Role.Name))
-		packet := g.getRealtimeBroadcastPacket()
-		packet.Event = "追放"
-		packet.ToIdx = &executed.Idx
-		g.obs.OnBroadcast(packet)
+		view := executed.View()
+		g.obs.OnExecute(g.id, g.currentDay, &view, g.gameState())
 		slog.Info("追放結果を設定しました", "id", g.id, "agent", executed.String())
 
 		g.getCurrentGameStatus().MediumResult = &model.Judge{
@@ -48,9 +44,7 @@ func (g *Game) doExecution() {
 		}
 		slog.Info("霊能結果を設定しました", "id", g.id, "target", executed.String(), "result", executed.Role.Species)
 	} else {
-		packet := g.getRealtimeBroadcastPacket()
-		packet.Event = "追放"
-		g.obs.OnBroadcast(packet)
+		g.obs.OnExecute(g.id, g.currentDay, nil, g.gameState())
 		slog.Warn("追放対象がいないため、追放結果を設定しません", "id", g.id)
 	}
 	slog.Info("追放フェーズを終了します", "id", g.id, "day", g.currentDay)

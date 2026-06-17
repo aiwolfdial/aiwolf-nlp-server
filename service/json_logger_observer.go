@@ -16,11 +16,11 @@ func (j *JSONLogger) AsObserver() observer.GameObserver {
 	return jsonLoggerObserver{l: j}
 }
 
-func (o jsonLoggerObserver) OnGameStart(id string, agents []model.AgentView) {
+func (o jsonLoggerObserver) OnGameStart(id string, agents []model.AgentView, _ model.GameState) {
 	o.l.TrackStartGame(id, agents)
 }
 
-func (o jsonLoggerObserver) OnGameEnd(id string, winSide model.Team) {
+func (o jsonLoggerObserver) OnGameEnd(id string, winSide model.Team, _ model.GameState) {
 	o.l.TrackEndGame(id, winSide)
 }
 
@@ -32,7 +32,7 @@ func (o jsonLoggerObserver) OnResponse(id string, agent model.AgentView, respons
 	o.l.TrackEndRequest(id, agent, response, err)
 }
 
-func (o jsonLoggerObserver) OnTalk(id string, agent model.AgentView, request model.Request, talk model.TalkView) {
+func (o jsonLoggerObserver) OnFreeformTalk(id string, agent model.AgentView, request model.Request, talk model.TalkView) {
 	o.l.TrackTalk(id, agent, request, talk)
 }
 
