@@ -29,17 +29,10 @@ func (s *Server) registerAPI(router *gin.Engine) {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
 
-	rulesets := api.Group("/rulesets")
-	if s.config.Server.Authentication.Enable {
-		rulesets.Use(receiverAuthMiddleware())
-	}
-	rulesets.GET("", func(c *gin.Context) {
-		summaries, err := s.rulesets.List()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"rulesets": summaries})
+	// The ruleset this process is running. The server runs one config per
+	// process, so this reports the active rules (not a catalog of files).
+	api.GET("/ruleset", func(c *gin.Context) {
+		c.JSON(http.StatusOK, s.config.RulesetInfo())
 	})
 
 	games := api.Group("/games")

@@ -25,10 +25,6 @@ COPY --from=build /out/aiwolf-nlp-server /aiwolf-nlp-server
 # volume over /config to override them.
 COPY --from=build /src/config/*.yml /config/
 
-# The ruleset registry scans this directory; point it at the bundled configs so
-# /api/v1/rulesets works regardless of the working directory.
-ENV AIWOLF_RULESETS_DIR=/config
-
 EXPOSE 8080
 ENTRYPOINT ["/aiwolf-nlp-server"]
 CMD ["-c", "/config/default_5.yml"]

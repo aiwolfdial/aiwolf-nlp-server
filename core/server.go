@@ -23,7 +23,6 @@ type Server struct {
 	upgrader            websocket.Upgrader
 	manager             *GameManager
 	liveState           *livestate.LiveState
-	rulesets            *model.RulesetRegistry
 	jsonLogger          *service.JSONLogger
 	gameLogger          *service.GameLogger
 	realtimeBroadcaster *service.RealtimeBroadcaster
@@ -39,7 +38,6 @@ func NewServer(config model.Config) (*Server, error) {
 			},
 		},
 		liveState: livestate.New(),
-		rulesets:  model.NewRulesetRegistry(rulesetsDir()),
 	}
 	gameSettings, err := model.NewSetting(config)
 	if err != nil {
@@ -66,15 +64,6 @@ func NewServer(config model.Config) (*Server, error) {
 	}
 	server.manager = NewGameManager(config, gameSettings, NewWaitingRoom(config), matchOptimizer, server.newObserver)
 	return server, nil
-}
-
-// rulesetsDir is the directory the ruleset registry scans for available game
-// configs. It defaults to ./config and can be overridden for containers.
-func rulesetsDir() string {
-	if v := os.Getenv("AIWOLF_RULESETS_DIR"); v != "" {
-		return v
-	}
-	return "./config"
 }
 
 // newObserver builds a fresh composite observer wiring every enabled sink. It is

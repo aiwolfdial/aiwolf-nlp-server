@@ -106,18 +106,17 @@ TTS（VOICEVOX）を利用する場合は `docker-compose.yml` の `voicevox` �
 | `AIWOLF_REALTIME_DIR` | `realtime_broadcaster.output_dir` |
 | `AIWOLF_TTS_HOST` | `tts_broadcaster.host` |
 | `AIWOLF_MATCH_OUTPUT` | `matching.output_path` |
-| `AIWOLF_RULESETS_DIR` | `/api/v1/rulesets` が走査する設定ディレクトリ |
 | `SECRET_KEY` | 認証有効時の JWT 検証鍵 |
 
 ## REST API
 
-エージェント用の WebSocket（`/ws`）に加えて、ゲームの進捗・設定を参照するための読み取り専用 REST API を提供します（`server.authentication.enable` が有効な場合、`/api/v1/games` と `/api/v1/rulesets` は RECEIVER トークンが必要です）。
+エージェント用の WebSocket（`/ws`）に加えて、ゲームの進捗・設定を参照するための読み取り専用 REST API を提供します（`server.authentication.enable` が有効な場合、`/api/v1/games` は RECEIVER トークンが必要です）。
 
 | エンドポイント | 説明 |
 | --- | --- |
 | `GET /api/v1/healthz` | 死活監視（常に 200） |
 | `GET /api/v1/readyz` | 受付可否（シャットダウン中は 503） |
+| `GET /api/v1/ruleset` | このサーバが実行中のルール（人数・役職構成など） |
 | `GET /api/v1/games` | 進行中ゲームの一覧 |
 | `GET /api/v1/games/:id` | 指定ゲームの現在状態 |
 | `GET /api/v1/games/:id/events` | ゲームのリアルタイムイベント（SSE） |
-| `GET /api/v1/rulesets` | 利用可能な設定ファイルの一覧 |
