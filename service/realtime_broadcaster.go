@@ -44,7 +44,7 @@ func NewRealtimeBroadcaster(config model.Config) *RealtimeBroadcaster {
 	return rb
 }
 
-func (rb *RealtimeBroadcaster) TrackStartGame(id string, agents []*model.Agent) {
+func (rb *RealtimeBroadcaster) TrackStartGame(id string, agents []model.AgentView) {
 	agentData := make([]any, 0, len(agents))
 	teamNames := make([]string, 0, len(agents))
 
@@ -100,16 +100,39 @@ func (rb *RealtimeBroadcaster) Broadcast(packet model.BroadcastPacket) {
 	if gameLogInterface, exists := rb.data.Load(packet.Id); exists {
 		gameLog := gameLogInterface.(*RealtimeBroadcasterLog)
 		gameLog.logsMu.Lock()
+		// Append only the new line to disk instead of rewriting the whole file on
+		// every packet, which was O(n^2) in the number of packets. The resulting
+		// file is byte-for-byte the same as before (lines joined by "\n"). Writes
+		// for a single game are serialized on its owning goroutine.
+		firstLine := len(gameLog.logs) == 0
 		gameLog.logs = append(gameLog.logs, string(data))
 		gameLog.updatedAt = time.Now()
-		logs := make([]string, len(gameLog.logs))
-		copy(logs, gameLog.logs)
 		filename := gameLog.filename
 		gameLog.logsMu.Unlock()
 
-		rb.writeGameFile(filename, logs)
+		rb.appendGameFileLine(filename, string(data), firstLine)
 		rb.writeGamesListFile()
 		slog.Info("JSONLファイルにブロードキャストを保存しました", "game_id", packet.Id)
+	}
+}
+
+func (rb *RealtimeBroadcaster) appendGameFileLine(filename string, line string, firstLine bool) {
+	filePath := filepath.Join(rb.config.OutputDir, fmt.Sprintf("%s.jsonl", filename))
+	flag := os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	content := "\n" + line
+	if firstLine {
+		// Start the file fresh and write the first line without a leading newline.
+		flag = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
+		content = line
+	}
+	file, err := os.OpenFile(filePath, flag, 0644)
+	if err != nil {
+		slog.Error("ゲームファイルのオープンに失敗しました", "error", err, "path", filePath)
+		return
+	}
+	defer file.Close()
+	if _, err := file.WriteString(content); err != nil {
+		slog.Error("ゲームファイルへの追記に失敗しました", "error", err, "path", filePath)
 	}
 }
 
@@ -122,11 +145,15 @@ func (rb *RealtimeBroadcaster) writeGamesListFile() {
 	items := make([]Item, 0)
 	rb.data.Range(func(_, value any) bool {
 		gameLog := value.(*RealtimeBroadcasterLog)
+		// updatedAt is mutated under logsMu by Broadcast on the owning game's
+		// goroutine; lock here so a concurrent game's list refresh reads it safely.
+		gameLog.logsMu.Lock()
 		item := Item{
 			ID:        gameLog.id,
 			Filename:  gameLog.filename,
 			UpdatedAt: gameLog.updatedAt,
 		}
+		gameLog.logsMu.Unlock()
 		items = append(items, item)
 		return true
 	})

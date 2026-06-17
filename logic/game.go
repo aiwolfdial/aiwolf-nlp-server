@@ -3,9 +3,10 @@ package logic
 import (
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
-	"github.com/aiwolfdial/aiwolf-nlp-server/service"
+	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 	"github.com/aiwolfdial/aiwolf-nlp-server/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -14,18 +15,15 @@ type Game struct {
 	id                           string
 	agents                       []*model.Agent
 	winSide                      model.Team
-	isFinished                   bool
-	config                       *model.Config
-	setting                      *model.Setting
+	isFinished                   atomic.Bool
+	ruleset                      model.RulesetView
+	setting                      model.SettingView
 	currentDay                   int
 	isDaytime                    bool
 	gameStatuses                 map[int]*model.GameStatus
 	lastTalkIdxMap               map[*model.Agent]int
 	lastWhisperIdxMap            map[*model.Agent]int
-	jsonLogger                   *service.JSONLogger
-	gameLogger                   *service.GameLogger
-	realtimeBroadcaster          *service.RealtimeBroadcaster
-	ttsBroadcaster               *service.TTSBroadcaster
+	obs                          observer.GameObserver
 	realtimeBroadcasterPacketIdx int
 }
 
@@ -55,14 +53,14 @@ func NewGame(config *model.Config, settings *model.Setting, conns []model.Connec
 		id:                id,
 		agents:            agents,
 		winSide:           model.T_NONE,
-		isFinished:        false,
-		config:            config,
-		setting:           settings,
+		ruleset:           model.NewRulesetView(*config),
+		setting:           model.NewSettingView(settings),
 		currentDay:        0,
 		isDaytime:         true,
 		gameStatuses:      gameStatuses,
 		lastTalkIdxMap:    make(map[*model.Agent]int),
 		lastWhisperIdxMap: make(map[*model.Agent]int),
+		obs:               observer.NoopObserver{},
 	}
 }
 
@@ -92,41 +90,29 @@ func NewGameWithRole(config *model.Config, settings *model.Setting, roleMapConns
 		id:                id,
 		agents:            agents,
 		winSide:           model.T_NONE,
-		isFinished:        false,
-		config:            config,
-		setting:           settings,
+		ruleset:           model.NewRulesetView(*config),
+		setting:           model.NewSettingView(settings),
 		currentDay:        0,
 		isDaytime:         true,
 		gameStatuses:      gameStatuses,
 		lastTalkIdxMap:    make(map[*model.Agent]int),
 		lastWhisperIdxMap: make(map[*model.Agent]int),
+		obs:               observer.NoopObserver{},
 	}
 }
 
 func (g *Game) Start() model.Team {
 	slog.Info("ゲームを開始します", "id", g.id)
-	if g.jsonLogger != nil {
-		g.jsonLogger.TrackStartGame(g.id, g.agents)
-	}
-	if g.gameLogger != nil {
-		g.gameLogger.TrackStartGame(g.id, g.agents)
-	}
-	if g.realtimeBroadcaster != nil {
-		g.realtimeBroadcaster.TrackStartGame(g.id, g.agents)
-	}
-	if g.ttsBroadcaster != nil {
-		g.ttsBroadcaster.CreateStream(g.id)
-	}
-	if g.realtimeBroadcaster != nil {
+	g.obs.OnGameStart(g.id, model.ViewsOf(g.agents))
+	g.obs.OnStreamCreate(g.id)
+	{
 		packet := g.getRealtimeBroadcastPacket()
 		packet.Event = "開始"
 		message := "ゲームが開始されました"
 		packet.Message = &message
-		g.realtimeBroadcaster.Broadcast(packet)
+		g.obs.OnBroadcast(packet)
 	}
-	if g.ttsBroadcaster != nil {
-		g.ttsBroadcaster.BroadcastText(g.id, "ゲームが開始されました", 23)
-	}
+	g.obs.OnSpeak(g.id, "ゲームが開始されました", 23)
 	g.requestToEveryone(model.R_INITIALIZE)
 	for {
 		g.progressDay()
@@ -135,7 +121,7 @@ func (g *Game) Start() model.Team {
 		g.gameStatuses[g.currentDay+1] = &gameStatus
 		g.currentDay++
 		slog.Info("日付が進みました", "id", g.id, "day", g.currentDay)
-		if g.config.Game.MaxDay >= 0 && g.currentDay >= g.config.Game.MaxDay+1 {
+		if g.ruleset.MaxDay() >= 0 && g.currentDay >= g.ruleset.MaxDay()+1 {
 			slog.Info("最大日数に達したため、ゲームを終了します", "id", g.id, "day", g.currentDay)
 			break
 		}
@@ -144,40 +130,28 @@ func (g *Game) Start() model.Team {
 		}
 	}
 	g.requestToEveryone(model.R_FINISH)
-	if g.gameLogger != nil {
-		for _, agent := range g.agents {
-			g.gameLogger.AppendLog(g.id, fmt.Sprintf("%d,status,%d,%s,%s,%s,%s", g.currentDay, agent.Idx, agent.Role.Name, g.getCurrentGameStatus().StatusMap[*agent].String(), agent.OriginalName, agent.GameName))
-		}
-		villagers, werewolves := util.CountAliveTeams(g.getCurrentGameStatus().StatusMap)
-		g.gameLogger.AppendLog(g.id, fmt.Sprintf("%d,result,%d,%d,%s", g.currentDay, villagers, werewolves, g.winSide))
+	for _, agent := range g.agents {
+		g.obs.OnLogLine(g.id, fmt.Sprintf("%d,status,%d,%s,%s,%s,%s", g.currentDay, agent.Idx, agent.Role.Name, g.getCurrentGameStatus().StatusMap[*agent].String(), agent.OriginalName, agent.GameName))
 	}
-	if g.realtimeBroadcaster != nil {
+	villagers, werewolves := util.CountAliveTeams(g.getCurrentGameStatus().StatusMap)
+	g.obs.OnLogLine(g.id, fmt.Sprintf("%d,result,%d,%d,%s", g.currentDay, villagers, werewolves, g.winSide))
+	{
 		packet := g.getRealtimeBroadcastPacket()
 		packet.Event = "終了"
 		message := string(g.winSide)
 		packet.Message = &message
-		g.realtimeBroadcaster.Broadcast(packet)
+		g.obs.OnBroadcast(packet)
 	}
-	if g.ttsBroadcaster != nil {
-		g.ttsBroadcaster.BroadcastText(g.id, "ゲームが終了しました", 23)
-	}
+	g.obs.OnSpeak(g.id, "ゲームが終了しました", 23)
 	g.closeAllAgents()
-	if g.jsonLogger != nil {
-		g.jsonLogger.TrackEndGame(g.id, g.winSide)
-	}
-	if g.gameLogger != nil {
-		g.gameLogger.TrackEndGame(g.id)
-	}
-	if g.realtimeBroadcaster != nil {
-		g.realtimeBroadcaster.TrackEndGame(g.id)
-	}
+	g.obs.OnGameEnd(g.id, g.winSide)
 	slog.Info("ゲームが終了しました", "id", g.id, "winSide", g.winSide)
-	g.isFinished = true
+	g.isFinished.Store(true)
 	return g.winSide
 }
 
 func (g *Game) shouldFinish() bool {
-	if util.CalcHasErrorAgents(g.agents) >= int(float64(len(g.agents))*g.config.Server.MaxContinueErrorRatio) {
+	if util.CalcHasErrorAgents(g.agents) >= int(float64(len(g.agents))*g.ruleset.MaxContinueErrorRatio()) {
 		slog.Warn("エラーが多発したため、ゲームを終了します", "id", g.id)
 		return true
 	}
@@ -193,13 +167,11 @@ func (g *Game) progressDay() {
 	slog.Info("昼セクションを開始します", "id", g.id, "day", g.currentDay)
 	g.isDaytime = true
 	g.requestToEveryone(model.R_DAILY_INITIALIZE)
-	if g.gameLogger != nil {
-		for _, agent := range g.agents {
-			g.gameLogger.AppendLog(g.id, fmt.Sprintf("%d,status,%d,%s,%s,%s,%s", g.currentDay, agent.Idx, agent.Role.Name, g.getCurrentGameStatus().StatusMap[*agent].String(), agent.OriginalName, agent.GameName))
-		}
+	for _, agent := range g.agents {
+		g.obs.OnLogLine(g.id, fmt.Sprintf("%d,status,%d,%s,%s,%s,%s", g.currentDay, agent.Idx, agent.Role.Name, g.getCurrentGameStatus().StatusMap[*agent].String(), agent.OriginalName, agent.GameName))
 	}
 
-	for _, phase := range g.config.Logic.DayPhases {
+	for _, phase := range g.ruleset.DayPhases() {
 		if phase.OnlyDay != nil && *phase.OnlyDay != g.currentDay {
 			slog.Info("実行対象の日ではないため、フェーズをスキップします", "id", g.id, "day", g.currentDay, "phase", phase.Name)
 			continue
@@ -223,7 +195,7 @@ func (g *Game) progressNight() {
 	g.isDaytime = false
 	g.requestToEveryone(model.R_DAILY_FINISH)
 
-	for _, phase := range g.config.Logic.NightPhases {
+	for _, phase := range g.ruleset.NightPhases() {
 		if phase.OnlyDay != nil && *phase.OnlyDay != g.currentDay {
 			slog.Info("実行対象の日ではないため、フェーズをスキップします", "id", g.id, "day", g.currentDay, "phase", phase.Name)
 			continue
@@ -267,18 +239,11 @@ func (g *Game) GetID() string {
 	return g.id
 }
 
-func (g *Game) SetJSONLogger(logger *service.JSONLogger) {
-	g.jsonLogger = logger
-}
-
-func (g *Game) SetGameLogger(logger *service.GameLogger) {
-	g.gameLogger = logger
-}
-
-func (g *Game) SetRealtimeBroadcaster(broadcaster *service.RealtimeBroadcaster) {
-	g.realtimeBroadcaster = broadcaster
-}
-
-func (g *Game) SetTTSBroadcaster(broadcaster *service.TTSBroadcaster) {
-	g.ttsBroadcaster = broadcaster
+// SetObserver sets the observer that receives this game's events. A nil
+// observer is replaced with a no-op so the game never holds a nil sink.
+func (g *Game) SetObserver(o observer.GameObserver) {
+	if o == nil {
+		o = observer.NoopObserver{}
+	}
+	g.obs = o
 }

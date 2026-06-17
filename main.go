@@ -19,7 +19,7 @@ var (
 
 func main() {
 	gin.SetMode(gin.ReleaseMode)
-	
+
 	if version == "" {
 		if godotenv.Load("./config/.env") != nil {
 			slog.Error("環境変数の読み込みに失敗しました")
@@ -59,6 +59,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	config.ApplyEnvOverrides()
 
 	if *analyzerMode {
 		core.Analyzer(*config)

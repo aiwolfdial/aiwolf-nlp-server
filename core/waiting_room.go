@@ -12,6 +12,7 @@ import (
 type WaitingRoom struct {
 	agentCount  int
 	selfMatch   bool
+	mu          sync.Mutex
 	connections sync.Map
 }
 
@@ -23,16 +24,23 @@ func NewWaitingRoom(config model.Config) *WaitingRoom {
 }
 
 func (wr *WaitingRoom) AddConnection(team string, connection model.Connection) {
+	// The per-team value is a slice; appending is a read-modify-write that must
+	// be serialized so concurrent connections (e.g. same-team self-match) don't
+	// race on the backing array or lose entries.
+	wr.mu.Lock()
 	value, _ := wr.connections.LoadOrStore(team, []model.Connection{})
 	connections := value.([]model.Connection)
 
 	updatedConnections := append(connections, connection)
 	wr.connections.Store(team, updatedConnections)
+	wr.mu.Unlock()
 
 	slog.Info("新しいクライアントが待機部屋に追加されました", "team", team, "remote_addr", connection.Conn.RemoteAddr().String())
 }
 
 func (wr *WaitingRoom) GetConnectionsWithMatchOptimizer(matches []map[model.Role][]string) (map[model.Role][]model.Connection, error) {
+	wr.mu.Lock()
+	defer wr.mu.Unlock()
 	var roleMapConns = make(map[model.Role][]model.Connection)
 
 	if len(matches) == 0 {
@@ -92,6 +100,8 @@ func (wr *WaitingRoom) GetConnectionsWithMatchOptimizer(matches []map[model.Role
 }
 
 func (wr *WaitingRoom) GetConnections() ([]model.Connection, error) {
+	wr.mu.Lock()
+	defer wr.mu.Unlock()
 	connections := []model.Connection{}
 	ready := false
 

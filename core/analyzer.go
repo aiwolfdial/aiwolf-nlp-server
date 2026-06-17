@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
+	"github.com/aiwolfdial/aiwolf-nlp-server/store"
 )
 
 func Analyzer(config model.Config) {
@@ -182,6 +183,7 @@ func Reduction(src model.Config, dst model.Config) {
 		slog.Error("マッチオプティマイザのパースに失敗しました", "error", err)
 		return
 	}
+	dstMo.store = store.NewFileMatchOptimizerStore(dst.Matching.OutputPath)
 
 	for _, srcMatch := range srcMo.EndedMatches {
 		for i, dstMatch := range dstMo.ScheduledMatches {

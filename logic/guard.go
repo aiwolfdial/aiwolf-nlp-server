@@ -37,15 +37,13 @@ func (g *Game) conductGuard(agent *model.Agent) {
 		Agent:  *agent,
 		Target: *target,
 	}
-	if g.gameLogger != nil {
-		g.gameLogger.AppendLog(g.id, fmt.Sprintf("%d,guard,%d,%d,%s", g.currentDay, agent.Idx, target.Idx, target.Role.Name))
-	}
-	if g.realtimeBroadcaster != nil {
+	g.obs.OnLogLine(g.id, fmt.Sprintf("%d,guard,%d,%d,%s", g.currentDay, agent.Idx, target.Idx, target.Role.Name))
+	{
 		packet := g.getRealtimeBroadcastPacket()
 		packet.Event = "護衛"
 		packet.FromIdx = &agent.Idx
 		packet.ToIdx = &target.Idx
-		g.realtimeBroadcaster.Broadcast(packet)
+		g.obs.OnBroadcast(packet)
 	}
 	slog.Info("護衛対象を設定しました", "id", g.id, "target", target.String())
 }

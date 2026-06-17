@@ -31,7 +31,7 @@ func NewGameLogger(config model.Config) *GameLogger {
 	}
 }
 
-func (g *GameLogger) TrackStartGame(id string, agents []*model.Agent) {
+func (g *GameLogger) TrackStartGame(id string, agents []model.AgentView) {
 	data := &GameLog{
 		id:     id,
 		logs:   make([]string, 0),

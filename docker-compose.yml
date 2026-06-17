@@ -1,0 +1,35 @@
+services:
+  server:
+    build:
+      context: .
+      args:
+        VERSION: docker
+    image: aiwolf-nlp-server:local
+    ports:
+      - "8080:8080"
+    environment:
+      # Bind to all interfaces inside the container; the published port maps to
+      # the host. See doc/ for the full list of AIWOLF_* overrides.
+      AIWOLF_HOST: "0.0.0.0"
+      AIWOLF_PORT: "8080"
+      # Persist logs under the mounted /log volume.
+      AIWOLF_JSON_LOG_DIR: "/log/json"
+      AIWOLF_GAME_LOG_DIR: "/log/game"
+      AIWOLF_REALTIME_DIR: "/log/realtime"
+      # Required only when server.authentication.enable is true.
+      SECRET_KEY: "${SECRET_KEY:-}"
+      # Point at the VOICEVOX sidecar below if TTS is enabled in the config.
+      # AIWOLF_TTS_HOST: "http://voicevox:50021"
+    volumes:
+      - ./config:/config
+      - ./log:/log
+    command: ["-c", "/config/default_5.yml"]
+
+  # Optional VOICEVOX engine for TTS. Uncomment this service and set
+  # AIWOLF_TTS_HOST above (and enable tts_broadcaster in the config) to use it.
+  # NOTE: the slim server image has no ffmpeg; build a TTS-enabled image (alpine
+  # base + `apk add ffmpeg`) if you rely on TTS.
+  # voicevox:
+  #   image: voicevox/voicevox_engine:cpu-latest
+  #   ports:
+  #     - "50021:50021"

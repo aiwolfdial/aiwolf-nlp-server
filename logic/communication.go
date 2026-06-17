@@ -23,10 +23,12 @@ func (g *Game) conductCommunication(request model.Request) {
 	switch request {
 	case model.R_TALK:
 		agents = g.getAliveAgents()
-		talkSetting = &g.setting.Talk.TalkSetting
+		ts := g.setting.TalkSetting()
+		talkSetting = &ts
 	case model.R_WHISPER:
 		agents = g.getAliveWerewolves()
-		talkSetting = &g.setting.Whisper.TalkSetting
+		ts := g.setting.WhisperSetting()
+		talkSetting = &ts
 	default:
 		return
 	}

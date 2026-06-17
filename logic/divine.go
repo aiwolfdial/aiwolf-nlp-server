@@ -39,15 +39,13 @@ func (g *Game) conductDivination(agent *model.Agent) {
 		Target: *target,
 		Result: target.Role.Species,
 	}
-	if g.gameLogger != nil {
-		g.gameLogger.AppendLog(g.id, fmt.Sprintf("%d,divine,%d,%d,%s", g.currentDay, agent.Idx, target.Idx, target.Role.Species))
-	}
-	if g.realtimeBroadcaster != nil {
+	g.obs.OnLogLine(g.id, fmt.Sprintf("%d,divine,%d,%d,%s", g.currentDay, agent.Idx, target.Idx, target.Role.Species))
+	{
 		packet := g.getRealtimeBroadcastPacket()
 		packet.Event = "占い"
 		packet.FromIdx = &agent.Idx
 		packet.ToIdx = &target.Idx
-		g.realtimeBroadcaster.Broadcast(packet)
+		g.obs.OnBroadcast(packet)
 	}
 	slog.Info("占い結果を設定しました", "id", g.id, "target", target.String(), "result", target.Role.Species)
 }

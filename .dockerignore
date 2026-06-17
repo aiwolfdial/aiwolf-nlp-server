@@ -1,0 +1,11 @@
+.git
+.github
+.vscode
+.claude
+dist
+log
+cache
+doc
+*.md
+.env
+.DS_Store

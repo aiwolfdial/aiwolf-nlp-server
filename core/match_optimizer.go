@@ -5,25 +5,24 @@ import (
 	"errors"
 	"log/slog"
 	"math"
-	"os"
-	"path/filepath"
 	"sort"
 	"sync"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
+	"github.com/aiwolfdial/aiwolf-nlp-server/store"
 	"github.com/aiwolfdial/aiwolf-nlp-server/util"
 )
 
 type MatchOptimizer struct {
-	mu               sync.RWMutex           `json:"-"`
-	outputPath       string                 `json:"-"`
-	InfiniteLoop     bool                   `json:"infinite_loop"`
-	TeamCount        int                    `json:"team_count"`
-	GameCount        int                    `json:"game_count"`
-	RoleNumMap       map[model.Role]int     `json:"role_num_map"`
-	IdxTeamMap       map[int]string         `json:"idx_team_map"`
-	ScheduledMatches []model.MatchWeight    `json:"scheduled_matches"`
-	EndedMatches     []map[model.Role][]int `json:"ended_matches"`
+	mu               sync.RWMutex              `json:"-"`
+	store            store.MatchOptimizerStore `json:"-"`
+	InfiniteLoop     bool                      `json:"infinite_loop"`
+	TeamCount        int                       `json:"team_count"`
+	GameCount        int                       `json:"game_count"`
+	RoleNumMap       map[model.Role]int        `json:"role_num_map"`
+	IdxTeamMap       map[int]string            `json:"idx_team_map"`
+	ScheduledMatches []model.MatchWeight       `json:"scheduled_matches"`
+	EndedMatches     []map[model.Role][]int    `json:"ended_matches"`
 }
 
 func (mo *MatchOptimizer) MarshalJSON() ([]byte, error) {
@@ -95,7 +94,8 @@ func (mo *MatchOptimizer) UnmarshalJSON(data []byte) error {
 }
 
 func NewMatchOptimizer(config model.Config) (*MatchOptimizer, error) {
-	data, err := os.ReadFile(config.Matching.OutputPath)
+	st := store.NewFileMatchOptimizerStore(config.Matching.OutputPath)
+	data, err := st.Load()
 	if err != nil {
 		slog.Warn("マッチオプティマイザの読み込みに失敗しました", "error", err)
 		return NewMatchOptimizerFromConfig(config)
@@ -105,7 +105,7 @@ func NewMatchOptimizer(config model.Config) (*MatchOptimizer, error) {
 		slog.Error("マッチオプティマイザのパースに失敗しました", "error", err)
 		return nil, err
 	}
-	mo.outputPath = config.Matching.OutputPath
+	mo.store = st
 	mo.save()
 	return &mo, nil
 }
@@ -117,7 +117,7 @@ func NewMatchOptimizerFromConfig(config model.Config) (*MatchOptimizer, error) {
 		return nil, err
 	}
 	mo := &MatchOptimizer{
-		outputPath:   config.Matching.OutputPath,
+		store:        store.NewFileMatchOptimizerStore(config.Matching.OutputPath),
 		InfiniteLoop: config.Matching.InfiniteLoop,
 		TeamCount:    config.Matching.TeamCount,
 		GameCount:    config.Matching.GameCount,
@@ -251,19 +251,12 @@ func (mo *MatchOptimizer) setMatchWeight(match map[model.Role][]string, weight f
 }
 
 func (mo *MatchOptimizer) save() error {
+	if mo.store == nil {
+		return errors.New("マッチオプティマイザのストアが設定されていません")
+	}
 	jsonData, err := json.Marshal(mo)
 	if err != nil {
 		return err
 	}
-	dir := filepath.Dir(mo.outputPath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		os.MkdirAll(dir, 0755)
-	}
-	file, err := os.Create(mo.outputPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	file.Write(jsonData)
-	return nil
+	return mo.store.Save(jsonData)
 }

@@ -6,30 +6,24 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
-	"time"
 
-	"github.com/aiwolfdial/aiwolf-nlp-server/logic"
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
+	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
+	"github.com/aiwolfdial/aiwolf-nlp-server/observer/livestate"
 	"github.com/aiwolfdial/aiwolf-nlp-server/service"
 	"github.com/aiwolfdial/aiwolf-nlp-server/util"
-	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
 type Server struct {
 	config              model.Config
 	upgrader            websocket.Upgrader
-	waitingRoom         *WaitingRoom
-	matchOptimizer      *MatchOptimizer
-	gameSetting         *model.Setting
-	games               sync.Map
-	mu                  sync.RWMutex
-	signaled            bool
+	manager             *GameManager
+	liveState           *livestate.LiveState
+	rulesets            *model.RulesetRegistry
 	jsonLogger          *service.JSONLogger
 	gameLogger          *service.GameLogger
 	realtimeBroadcaster *service.RealtimeBroadcaster
@@ -44,16 +38,13 @@ func NewServer(config model.Config) (*Server, error) {
 				return true
 			},
 		},
-		waitingRoom: NewWaitingRoom(config),
-		games:       sync.Map{},
-		mu:          sync.RWMutex{},
-		signaled:    false,
+		liveState: livestate.New(),
+		rulesets:  model.NewRulesetRegistry(rulesetsDir()),
 	}
 	gameSettings, err := model.NewSetting(config)
 	if err != nil {
 		return nil, errors.New("ゲーム設定の作成に失敗しました")
 	}
-	server.gameSetting = gameSettings
 	if config.JSONLogger.Enable {
 		server.jsonLogger = service.NewJSONLogger(config)
 	}
@@ -66,57 +57,58 @@ func NewServer(config model.Config) (*Server, error) {
 	if config.RealtimeBroadcaster.Enable {
 		server.realtimeBroadcaster = service.NewRealtimeBroadcaster(config)
 	}
+	var matchOptimizer *MatchOptimizer
 	if config.Matching.IsOptimize {
-		matchOptimizer, err := NewMatchOptimizer(config)
+		matchOptimizer, err = NewMatchOptimizer(config)
 		if err != nil {
 			return nil, errors.New("マッチオプティマイザの作成に失敗しました")
 		}
-		server.matchOptimizer = matchOptimizer
 	}
+	server.manager = NewGameManager(config, gameSettings, NewWaitingRoom(config), matchOptimizer, server.newObserver)
 	return server, nil
 }
 
+// rulesetsDir is the directory the ruleset registry scans for available game
+// configs. It defaults to ./config and can be overridden for containers.
+func rulesetsDir() string {
+	if v := os.Getenv("AIWOLF_RULESETS_DIR"); v != "" {
+		return v
+	}
+	return "./config"
+}
+
+// newObserver builds a fresh composite observer wiring every enabled sink. It is
+// passed to the GameManager and invoked once per game.
+func (s *Server) newObserver() observer.GameObserver {
+	var observers []observer.GameObserver
+	if s.jsonLogger != nil {
+		observers = append(observers, s.jsonLogger.AsObserver())
+	}
+	if s.gameLogger != nil {
+		observers = append(observers, s.gameLogger.AsObserver())
+	}
+	if s.realtimeBroadcaster != nil {
+		observers = append(observers, s.realtimeBroadcaster.AsObserver())
+	}
+	if s.ttsBroadcaster != nil {
+		observers = append(observers, s.ttsBroadcaster.AsObserver())
+	}
+	if s.liveState != nil {
+		observers = append(observers, s.liveState)
+	}
+	return observer.NewComposite(observers...)
+}
+
 func (s *Server) Run() {
-	router := gin.Default()
-	router.Use(func(c *gin.Context) {
-		c.Header("Server", "aiwolf-nlp-server/"+Version.Version+" "+runtime.Version()+" ("+runtime.GOOS+"; "+runtime.GOARCH+")")
-
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Ngrok-Skip-Browser-Warning")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
-
-	router.GET("/ws", func(c *gin.Context) {
-		s.handleConnections(c.Writer, c.Request)
-	})
-
-	if s.config.RealtimeBroadcaster.Enable {
-		realtimeGroup := router.Group("/realtime")
-		if s.config.Server.Authentication.Enable {
-			realtimeGroup.Use(s.verifyMiddleware())
-		}
-		realtimeGroup.Static("/", s.config.RealtimeBroadcaster.OutputDir)
-	}
-
-	if s.config.TTSBroadcaster.Enable {
-		router.Static("/tts", s.config.TTSBroadcaster.SegmentDir)
-		go s.ttsBroadcaster.Start()
-	}
+	router := s.buildRouter()
 
 	go func() {
 		trap := make(chan os.Signal, 1)
 		signal.Notify(trap, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGINT)
 		sig := <-trap
 		slog.Info("シグナルを受信しました", "signal", sig)
-		s.signaled = true
-		s.gracefullyShutdown()
+		s.manager.BeginShutdown()
+		s.manager.WaitAllFinished()
 		os.Exit(0)
 	}()
 
@@ -128,27 +120,8 @@ func (s *Server) Run() {
 	}
 }
 
-func (s *Server) gracefullyShutdown() {
-	for {
-		isFinished := true
-		s.games.Range(func(key, value any) bool {
-			game, ok := value.(*logic.Game)
-			if !ok || !game.IsFinished() {
-				isFinished = false
-				return false
-			}
-			return true
-		})
-		if isFinished {
-			break
-		}
-		time.Sleep(15 * time.Second)
-	}
-	slog.Info("全てのゲームが終了しました")
-}
-
 func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request) {
-	if s.signaled {
+	if s.manager.IsShuttingDown() {
 		slog.Warn("シグナルを受信したため、新しい接続を受け付けません")
 		return
 	}
@@ -182,70 +155,6 @@ func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	s.waitingRoom.AddConnection(conn.TeamName, *conn)
 
-	var game *logic.Game
-	if s.config.Matching.IsOptimize {
-		s.waitingRoom.connections.Range(func(key, value any) bool {
-			team := key.(string)
-			s.matchOptimizer.updateTeam(team)
-			return true
-		})
-		matches := s.matchOptimizer.getMatches()
-		roleMapConns, err := s.waitingRoom.GetConnectionsWithMatchOptimizer(matches)
-		if err != nil {
-			slog.Error("待機部屋からの接続の取得に失敗しました", "error", err)
-			return
-		}
-		game = logic.NewGameWithRole(&s.config, s.gameSetting, roleMapConns)
-	} else {
-		connections, err := s.waitingRoom.GetConnections()
-		if err != nil {
-			slog.Error("待機部屋からの接続の取得に失敗しました", "error", err)
-			return
-		}
-		game = logic.NewGame(&s.config, s.gameSetting, connections)
-	}
-	if s.jsonLogger != nil {
-		game.SetJSONLogger(s.jsonLogger)
-	}
-	if s.gameLogger != nil {
-		game.SetGameLogger(s.gameLogger)
-	}
-	if s.realtimeBroadcaster != nil {
-		game.SetRealtimeBroadcaster(s.realtimeBroadcaster)
-	}
-	if s.ttsBroadcaster != nil {
-		game.SetTTSBroadcaster(s.ttsBroadcaster)
-	}
-	s.games.Store(game.GetID(), game)
-
-	go func() {
-		winSide := game.Start()
-		if s.config.Matching.IsOptimize {
-			if winSide != model.T_NONE {
-				s.matchOptimizer.setMatchEnd(game.GetRoleTeamNamesMap())
-			} else {
-				s.matchOptimizer.setMatchWeight(game.GetRoleTeamNamesMap(), 0)
-			}
-		}
-	}()
-}
-
-func (s *Server) verifyMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		token := c.Query("token")
-		if token == "" {
-			token = strings.ReplaceAll(c.GetHeader("Authorization"), "Bearer ", "")
-		}
-		if token == "" {
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		if !util.IsValidReceiver(os.Getenv("SECRET_KEY"), token) {
-			c.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		c.Next()
-	}
+	s.manager.TryStartGame(*conn)
 }

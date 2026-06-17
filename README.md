@@ -82,3 +82,42 @@ chmod u+x ./aiwolf-nlp-server-darwin-arm64
 # ./aiwolf-nlp-server-darwin-arm64 -c ./default_9.yml # 9人ゲームの場合
 # ./aiwolf-nlp-server-darwin-arm64 -c ./default_13.yml # 13人ゲームの場合
 ```
+
+### Docker
+
+```bash
+docker compose up --build # default_5.yml で起動（ポート 8080 を公開）
+```
+
+設定ファイルは `./config` を、ログは `./log` をマウントして利用します。\
+TTS（VOICEVOX）を利用する場合は `docker-compose.yml` の `voicevox` サービスのコメントを外し、`AIWOLF_TTS_HOST` を設定してください（スリムなサーバイメージには ffmpeg は含まれません）。
+
+## 環境変数による上書き
+
+コンテナ実行など、設定ファイルを編集せずにサーバ設定を上書きしたい場合は、以下の環境変数が利用できます（未設定時は設定ファイルの値が使われます）。
+
+| 環境変数 | 上書き対象 |
+| --- | --- |
+| `AIWOLF_HOST` | `server.web_socket.host` |
+| `AIWOLF_PORT` | `server.web_socket.port` |
+| `AIWOLF_AUTH_ENABLE` | `server.authentication.enable` |
+| `AIWOLF_JSON_LOG_DIR` | `json_logger.output_dir` |
+| `AIWOLF_GAME_LOG_DIR` | `game_logger.output_dir` |
+| `AIWOLF_REALTIME_DIR` | `realtime_broadcaster.output_dir` |
+| `AIWOLF_TTS_HOST` | `tts_broadcaster.host` |
+| `AIWOLF_MATCH_OUTPUT` | `matching.output_path` |
+| `AIWOLF_RULESETS_DIR` | `/api/v1/rulesets` が走査する設定ディレクトリ |
+| `SECRET_KEY` | 認証有効時の JWT 検証鍵 |
+
+## REST API
+
+エージェント用の WebSocket（`/ws`）に加えて、ゲームの進捗・設定を参照するための読み取り専用 REST API を提供します（`server.authentication.enable` が有効な場合、`/api/v1/games` と `/api/v1/rulesets` は RECEIVER トークンが必要です）。
+
+| エンドポイント | 説明 |
+| --- | --- |
+| `GET /api/v1/healthz` | 死活監視（常に 200） |
+| `GET /api/v1/readyz` | 受付可否（シャットダウン中は 503） |
+| `GET /api/v1/games` | 進行中ゲームの一覧 |
+| `GET /api/v1/games/:id` | 指定ゲームの現在状態 |
+| `GET /api/v1/games/:id/events` | ゲームのリアルタイムイベント（SSE） |
+| `GET /api/v1/rulesets` | 利用可能な設定ファイルの一覧 |
