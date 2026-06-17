@@ -1,4 +1,4 @@
-package core
+package matchmaking
 
 import (
 	"errors"
@@ -35,6 +35,16 @@ func (wr *WaitingRoom) AddConnection(team string, connection model.Connection) {
 	wr.mu.Unlock()
 
 	slog.Info("新しいクライアントが待機部屋に追加されました", "team", team, "remote_addr", connection.Conn.RemoteAddr().String())
+}
+
+// 待機中のチーム名を返す。マッチオプティマイザへのチーム登録に使う。
+func (wr *WaitingRoom) Teams() []string {
+	var teams []string
+	wr.connections.Range(func(key, _ any) bool {
+		teams = append(teams, key.(string))
+		return true
+	})
+	return teams
 }
 
 func (wr *WaitingRoom) GetConnectionsWithMatchOptimizer(matches []map[model.Role][]string) (map[model.Role][]model.Connection, error) {

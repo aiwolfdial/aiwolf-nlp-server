@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/aiwolfdial/aiwolf-nlp-server/core"
+	"github.com/aiwolfdial/aiwolf-nlp-server/matchmaking"
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 )
 
@@ -14,7 +14,7 @@ func TestInitializeMatchOptimizer(t *testing.T) {
 		t.Fatalf("設定ファイルの読み込みに失敗しました: %v", err)
 	}
 
-	mo, err := core.NewMatchOptimizerFromConfig(*config)
+	mo, err := matchmaking.NewMatchOptimizerFromConfig(*config)
 	if err != nil {
 		t.Fatalf("マッチオプティマイザの初期化に失敗しました: %v", err)
 	}

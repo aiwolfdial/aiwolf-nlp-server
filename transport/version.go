@@ -1,4 +1,4 @@
-package core
+package transport
 
 type VersionInfo struct {
 	Version  string `json:"version"`

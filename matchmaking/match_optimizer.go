@@ -1,4 +1,4 @@
-package core
+package matchmaking
 
 import (
 	"encoding/json"
@@ -128,7 +128,7 @@ func NewMatchOptimizerFromConfig(config model.Config) (*MatchOptimizer, error) {
 	return mo, nil
 }
 
-func (mo *MatchOptimizer) getMatches() []map[model.Role][]string {
+func (mo *MatchOptimizer) GetMatches() []map[model.Role][]string {
 	mo.mu.Lock()
 	defer mo.mu.Unlock()
 	count := 0
@@ -151,7 +151,7 @@ func (mo *MatchOptimizer) getMatches() []map[model.Role][]string {
 	return matches
 }
 
-func (mo *MatchOptimizer) updateTeam(team string) {
+func (mo *MatchOptimizer) UpdateTeam(team string) {
 	mo.mu.Lock()
 	defer mo.mu.Unlock()
 	for _, t := range mo.IdxTeamMap {
@@ -215,7 +215,7 @@ func (mo *MatchOptimizer) append() error {
 	return errors.New("最適なマッチングが見つかりませんでした")
 }
 
-func (mo *MatchOptimizer) setMatchEnd(match map[model.Role][]string) {
+func (mo *MatchOptimizer) SetMatchEnd(match map[model.Role][]string) {
 	mo.mu.Lock()
 	defer mo.mu.Unlock()
 	idxMatch := util.TeamNameMatchToIdxMatch(mo.IdxTeamMap, match)
@@ -234,7 +234,7 @@ func (mo *MatchOptimizer) setMatchEnd(match map[model.Role][]string) {
 	slog.Warn("スケジュールされたマッチが見つかりませんでした")
 }
 
-func (mo *MatchOptimizer) setMatchWeight(match map[model.Role][]string, weight float64) {
+func (mo *MatchOptimizer) SetMatchWeight(match map[model.Role][]string, weight float64) {
 	mo.mu.Lock()
 	defer mo.mu.Unlock()
 	idxMatch := util.TeamNameMatchToIdxMatch(mo.IdxTeamMap, match)

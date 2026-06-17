@@ -5,8 +5,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/aiwolfdial/aiwolf-nlp-server/core"
+	"github.com/aiwolfdial/aiwolf-nlp-server/matchmaking"
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
+	"github.com/aiwolfdial/aiwolf-nlp-server/transport"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -30,7 +31,7 @@ func main() {
 		}
 	}
 
-	core.SetVersion(version, revision, build)
+	transport.SetVersion(version, revision, build)
 
 	var (
 		configPath    = flag.String("c", "./default.yml", "設定ファイルのパス")
@@ -44,9 +45,9 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		println("version:", core.Version.Version)
-		println("revision:", core.Version.Revision)
-		println("build:", core.Version.Build)
+		println("version:", transport.Version.Version)
+		println("revision:", transport.Version.Revision)
+		println("build:", transport.Version.Build)
 		os.Exit(0)
 	}
 
@@ -62,7 +63,7 @@ func main() {
 	config.ApplyEnvOverrides()
 
 	if *analyzerMode {
-		core.Analyzer(*config)
+		matchmaking.Analyzer(*config)
 		return
 	}
 
@@ -75,11 +76,11 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		core.Reduction(*srcConfig, *dstConfig)
+		matchmaking.Reduction(*srcConfig, *dstConfig)
 		return
 	}
 
-	server, err := core.NewServer(*config)
+	server, err := transport.NewServer(*config)
 	if err != nil {
 		panic(err)
 	}

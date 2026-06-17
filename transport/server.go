@@ -1,4 +1,4 @@
-package core
+package transport
 
 import (
 	"errors"
@@ -10,9 +10,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/aiwolfdial/aiwolf-nlp-server/matchmaking"
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer/livestate"
+	"github.com/aiwolfdial/aiwolf-nlp-server/orchestrator"
 	"github.com/aiwolfdial/aiwolf-nlp-server/service"
 	"github.com/aiwolfdial/aiwolf-nlp-server/util"
 	"github.com/gorilla/websocket"
@@ -21,7 +23,7 @@ import (
 type Server struct {
 	config              model.Config
 	upgrader            websocket.Upgrader
-	manager             *GameManager
+	manager             *orchestrator.GameManager
 	liveState           *livestate.LiveState
 	jsonLogger          *service.JSONLogger
 	gameLogger          *service.GameLogger
@@ -55,14 +57,14 @@ func NewServer(config model.Config) (*Server, error) {
 	if config.RealtimeBroadcaster.Enable {
 		server.realtimeBroadcaster = service.NewRealtimeBroadcaster(config)
 	}
-	var matchOptimizer *MatchOptimizer
+	var matchOptimizer *matchmaking.MatchOptimizer
 	if config.Matching.IsOptimize {
-		matchOptimizer, err = NewMatchOptimizer(config)
+		matchOptimizer, err = matchmaking.NewMatchOptimizer(config)
 		if err != nil {
 			return nil, errors.New("マッチオプティマイザの作成に失敗しました")
 		}
 	}
-	server.manager = NewGameManager(config, gameSettings, NewWaitingRoom(config), matchOptimizer, server.newObserver)
+	server.manager = orchestrator.NewGameManager(config, gameSettings, matchmaking.NewWaitingRoom(config), matchOptimizer, server.newObserver)
 	return server, nil
 }
 

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aiwolfdial/aiwolf-nlp-server/core"
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
+	"github.com/aiwolfdial/aiwolf-nlp-server/transport"
 )
 
 const WebSocketExternalHost = "0.0.0.0"
@@ -24,7 +24,7 @@ func launchAsyncServer(t *testing.T, config *model.Config) url.URL {
 	port := getAvailableTcpPort(config.Server.WebSocket.Host)
 	config.Server.WebSocket.Port = port
 	go func() {
-		server, err := core.NewServer(*config)
+		server, err := transport.NewServer(*config)
 		if err != nil {
 			return
 		}

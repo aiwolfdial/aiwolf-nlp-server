@@ -1,4 +1,4 @@
-package core
+package orchestrator
 
 import (
 	"log/slog"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aiwolfdial/aiwolf-nlp-server/logic"
+	"github.com/aiwolfdial/aiwolf-nlp-server/matchmaking"
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 )
@@ -17,8 +18,8 @@ import (
 type GameManager struct {
 	config          model.Config
 	gameSetting     *model.Setting
-	waitingRoom     *WaitingRoom
-	matchOptimizer  *MatchOptimizer
+	waitingRoom     *matchmaking.WaitingRoom
+	matchOptimizer  *matchmaking.MatchOptimizer
 	observerFactory func() observer.GameObserver
 	games           sync.Map
 	shuttingDown    atomic.Bool
@@ -40,7 +41,7 @@ func (e *gameEntry) snapshot() model.GameSnapshot {
 	}
 }
 
-func NewGameManager(config model.Config, gameSetting *model.Setting, waitingRoom *WaitingRoom, matchOptimizer *MatchOptimizer, observerFactory func() observer.GameObserver) *GameManager {
+func NewGameManager(config model.Config, gameSetting *model.Setting, waitingRoom *matchmaking.WaitingRoom, matchOptimizer *matchmaking.MatchOptimizer, observerFactory func() observer.GameObserver) *GameManager {
 	return &GameManager{
 		config:          config,
 		gameSetting:     gameSetting,
@@ -56,12 +57,10 @@ func (m *GameManager) TryStartGame(conn model.Connection) {
 
 	var game *logic.Game
 	if m.matchOptimizer != nil {
-		m.waitingRoom.connections.Range(func(key, value any) bool {
-			team := key.(string)
-			m.matchOptimizer.updateTeam(team)
-			return true
-		})
-		matches := m.matchOptimizer.getMatches()
+		for _, team := range m.waitingRoom.Teams() {
+			m.matchOptimizer.UpdateTeam(team)
+		}
+		matches := m.matchOptimizer.GetMatches()
 		roleMapConns, err := m.waitingRoom.GetConnectionsWithMatchOptimizer(matches)
 		if err != nil {
 			slog.Error("待機部屋からの接続の取得に失敗しました", "error", err)
@@ -88,9 +87,9 @@ func (m *GameManager) TryStartGame(conn model.Connection) {
 		winSide := game.Start()
 		if m.matchOptimizer != nil {
 			if winSide != model.T_NONE {
-				m.matchOptimizer.setMatchEnd(game.GetRoleTeamNamesMap())
+				m.matchOptimizer.SetMatchEnd(game.GetRoleTeamNamesMap())
 			} else {
-				m.matchOptimizer.setMatchWeight(game.GetRoleTeamNamesMap(), 0)
+				m.matchOptimizer.SetMatchWeight(game.GetRoleTeamNamesMap(), 0)
 			}
 		}
 		// 終了したゲームを登録簿から取り除く。これがないとプロセス終了まで残り続ける。

@@ -1,4 +1,4 @@
-package core
+package matchmaking
 
 import (
 	"bufio"
