@@ -36,6 +36,7 @@ jobs:
             config/default_en_9.yml
             config/default_en_13.yml
             config/freeform_5.yml
+            config/freeform_en_5.yml
             config/example.env
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

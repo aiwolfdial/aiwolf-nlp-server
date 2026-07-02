@@ -25,11 +25,15 @@ curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/downloa
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_5.yml
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_9.yml
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_13.yml
+curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/freeform_5.yml
+curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/freeform_en_5.yml
 curl -Lo .env https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/example.env
 chmod u+x ./aiwolf-nlp-server-linux-amd64
 ./aiwolf-nlp-server-linux-amd64 -c ./default_5.yml # For 5-player games
 # ./aiwolf-nlp-server-linux-amd64 -c ./default_9.yml # For 9-player games
 # ./aiwolf-nlp-server-linux-amd64 -c ./default_13.yml # For 13-player games
+# ./aiwolf-nlp-server-linux-amd64 -c ./freeform_5.yml # For 5-player games (group chat/freeform mode)
+# ./aiwolf-nlp-server-linux-amd64 -c ./freeform_en_5.yml # For 5-player games (group chat/freeform mode, English)
 ```
 
 ### Windows
@@ -39,10 +43,14 @@ curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/downloa
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_5.yml
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_9.yml
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_13.yml
+curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/freeform_5.yml
+curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/freeform_en_5.yml
 curl -Lo .env https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/example.env
 .\aiwolf-nlp-server-windows-amd64.exe -c .\default_5.yml # For 5-player games
 # .\aiwolf-nlp-server-windows-amd64.exe -c .\default_9.yml # For 9-player games
 # .\aiwolf-nlp-server-windows-amd64.exe -c .\default_13.yml # For 13-player games
+# .\aiwolf-nlp-server-windows-amd64.exe -c .\freeform_5.yml # For 5-player games (group chat/freeform mode)
+# .\aiwolf-nlp-server-windows-amd64.exe -c .\freeform_en_5.yml # For 5-player games (group chat/freeform mode, English)
 ```
 
 ### macOS (Intel)
@@ -57,11 +65,15 @@ curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/downloa
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_5.yml
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_9.yml
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_13.yml
+curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/freeform_5.yml
+curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/freeform_en_5.yml
 curl -Lo .env https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/example.env
 chmod u+x ./aiwolf-nlp-server-darwin-amd64
 ./aiwolf-nlp-server-darwin-amd64 -c ./default_5.yml # For 5-player games
 # ./aiwolf-nlp-server-darwin-amd64 -c ./default_9.yml # For 9-player games
 # ./aiwolf-nlp-server-darwin-amd64 -c ./default_13.yml # For 13-player games
+# ./aiwolf-nlp-server-darwin-amd64 -c ./freeform_5.yml # For 5-player games (group chat/freeform mode)
+# ./aiwolf-nlp-server-darwin-amd64 -c ./freeform_en_5.yml # For 5-player games (group chat/freeform mode, English)
 ```
 
 ### macOS (Apple Silicon)
@@ -76,9 +88,13 @@ curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/downloa
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_5.yml
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_9.yml
 curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/default_13.yml
+curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/freeform_5.yml
+curl -LO https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/freeform_en_5.yml
 curl -Lo .env https://github.com/aiwolfdial/aiwolf-nlp-server/releases/latest/download/example.env
 chmod u+x ./aiwolf-nlp-server-darwin-arm64
 ./aiwolf-nlp-server-darwin-arm64 -c ./default_5.yml # For 5-player games
 # ./aiwolf-nlp-server-darwin-arm64 -c ./default_9.yml # For 9-player games
 # ./aiwolf-nlp-server-darwin-arm64 -c ./default_13.yml # For 13-player games
+# ./aiwolf-nlp-server-darwin-arm64 -c ./freeform_5.yml # For 5-player games (group chat/freeform mode)
+# ./aiwolf-nlp-server-darwin-arm64 -c ./freeform_en_5.yml # For 5-player games (group chat/freeform mode, English)
 ```
