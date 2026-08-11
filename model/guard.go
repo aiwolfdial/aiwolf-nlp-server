@@ -1,7 +1,8 @@
 package model
 
+// 護衛はサーバ内部の状態としてのみ保持し、エージェントへは送信しない。
 type Guard struct {
-	Day    int   `json:"day"`
-	Agent  Agent `json:"agent"`
-	Target Agent `json:"target"`
+	Day    int
+	Agent  Agent
+	Target Agent
 }

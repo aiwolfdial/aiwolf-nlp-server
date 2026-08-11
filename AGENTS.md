@@ -11,6 +11,8 @@ go test -race ./...               # 全テスト（test/ 配下は実際にサ�
 go test -race ./test/ -run TestTalkPhase1 -v  # 個別テスト
 go vet ./...                      # 静的解析
 gofmt -l .                        # 未整形ファイルの検出
+./schema/generate.sh              # スキーマから生成物を更新
+./schema/generate.sh --check      # 生成物がスキーマと一致するか検査（CIと同じ）
 go run . -c ./config/default_5.yml      # 5人村で起動
 go run . -c ./config/freeform_5.yml     # 5人村（グループチャット方式）で起動
 ```
@@ -35,7 +37,9 @@ CI (`.github/workflows/test.yml`) は Go 1.25.x で `go build -race` と `go tes
 | `orchestrator/` | `GameManager`。マッチング成立からゲーム生成・破棄・シャットダウンまで |
 | `matchmaking/` | 待機部屋、マッチオプティマイザ、マッチ履歴の解析 |
 | `logic/` | ゲームロジック。日付進行、各フェーズ、発言の集約と制限 |
+| `schema/` | エージェント向けプロトコルのJSON Schemaと、生成コマンドをまとめたスクリプト |
 | `model/` | 設定・パケット・エージェント等のデータ構造。他パッケージに依存しない |
+| `model/wire/` | エージェントへ送信するJSONの構造そのもの。`schema/` からの生成物 |
 | `observer/` | ゲームイベントの通知インターフェースと配信の共通実装 |
 | `service/` | observer の実装。JSON ログ、ゲームログ、リアルタイム配信、TTS |
 | `store/` | マッチオプティマイザの永続化 |
@@ -51,6 +55,12 @@ CI (`.github/workflows/test.yml`) は Go 1.25.x で `go build -race` と `go tes
 
 ## 設計上の約束
 
+- **エージェント向けプロトコルの定義は `schema/protocol.schema.json` が唯一の出所**です。パケットの項目を増やす・型を変える・説明を直すときは、まずスキーマを編集して `./schema/generate.sh` を実行します。生成は既製のツール（go-jsonschema / jsonschema2md / datamodel-code-generator）が行います。次のものはすべて生成物なので直接編集しないでください。
+  - `model/wire/wire_gen.go`: エージェントへ送るJSONの構造
+  - `doc/ja/protocol-schema.md` と `doc/en/protocol-schema.md`
+  - `aiwolf-nlp-common` の `src/aiwolf_nlp_common/packet/_models.py`
+- **役職の陣営・種族とリクエストの応答要否は `schema/enum_attributes.json`** にあります。JSON Schema では列挙値の付随属性を表現できないため、Go 側 (`model/role.go` `model/request.go`) は手書きのままで、`model/schema_test.go` が一致を検査します。
+- **エージェントへ送るJSONは必ず `model/wire` の型を経由します。** `model` 側のドメイン型（`Agent` を含む `Talk` や、`map[Agent]Status` を持つ `Info` など）はサーバ内部の都合で持つ形なので、`MarshalJSON` で wire の型へ詰め替えてから送ります。スキーマにない項目は wire の型に存在しないため、`model` にフィールドを足しても送信されません。逆にスキーマへ項目を足して詰め替えを書き忘れた場合は、`model/wire_conformance_test.go` が検出します。
 - **observer は logic の唯一の外部出力口**です。ロガーや配信を追加する場合は `observer.GameObserver` を実装し、`transport.Server.newObserver` で合成します。`logic` から直接ファイルや HTTP を触らないでください。
 - **整形は sink 側で行います。** CSV 書式やブロードキャストパケットの組み立ては `service` / `observer` 側の責務で、`logic` はセマンティックなイベントを通知するだけです。
 - **observer へ渡す値は読み取り専用のビュー型**（`model.AgentView` / `model.TalkView` / `model.GameSnapshot`）にします。`model.Agent` は `Connection` を含むため外部へ渡しません。
@@ -80,8 +90,10 @@ CI (`.github/workflows/test.yml`) は Go 1.25.x で `go build -race` と `go tes
 - [REST API について](/doc/ja/api.md): 監視・観戦用の HTTP API
 - [アーキテクチャについて](/doc/ja/architecture.md): パッケージ構成と拡張点
 
-設定キーを追加・改名した場合は `config/*.yml` すべてと `doc/*/config.md` を、\
-パケットの構造を変えた場合は `doc/*/protocol.md` を合わせて更新します。
+設定キーを追加・改名した場合は `config/*.yml` すべてと `doc/*/config.md` を合わせて更新します。\
+パケットの各項目の型と説明は `doc/*/protocol-schema.md` にあり、これはスキーマからの生成物です。\
+スキーマ側の `description` と `x-description-en` を直して `./schema/generate.sh` を実行してください。\
+`doc/*/protocol.md` のリクエストごとの解説は手書きなので、そちらは日英とも手で更新します。
 
 ## コミット
 

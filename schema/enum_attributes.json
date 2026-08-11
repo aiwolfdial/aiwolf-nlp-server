@@ -1,0 +1,52 @@
+{
+  "Role": {
+    "properties": {
+      "team": {
+        "type": "Team",
+        "description": "この役職が属する陣営.",
+        "x-description-en": "The team this role belongs to."
+      },
+      "species": {
+        "type": "Species",
+        "description": "この役職の種族.",
+        "x-description-en": "The species of this role."
+      }
+    },
+    "values": {
+      "WEREWOLF": { "team": "WEREWOLF", "species": "WEREWOLF" },
+      "POSSESSED": { "team": "WEREWOLF", "species": "HUMAN" },
+      "SEER": { "team": "VILLAGER", "species": "HUMAN" },
+      "BODYGUARD": { "team": "VILLAGER", "species": "HUMAN" },
+      "VILLAGER": { "team": "VILLAGER", "species": "HUMAN" },
+      "MEDIUM": { "team": "VILLAGER", "species": "HUMAN" }
+    }
+  },
+  "Request": {
+    "properties": {
+      "require_response": {
+        "type": "bool",
+        "description": "このリクエストに対してエージェントが応答を返す必要があるか.",
+        "x-description-en": "Whether the agent must send a response to this request."
+      }
+    },
+    "values": {
+      "NAME": { "require_response": true },
+      "TALK": { "require_response": true },
+      "WHISPER": { "require_response": true },
+      "VOTE": { "require_response": true },
+      "DIVINE": { "require_response": true },
+      "GUARD": { "require_response": true },
+      "ATTACK": { "require_response": true },
+      "INITIALIZE": { "require_response": false },
+      "DAILY_INITIALIZE": { "require_response": false },
+      "DAILY_FINISH": { "require_response": false },
+      "FINISH": { "require_response": false },
+      "TALK_PHASE_START": { "require_response": false },
+      "TALK_PHASE_END": { "require_response": false },
+      "TALK_BROADCAST": { "require_response": false },
+      "WHISPER_PHASE_START": { "require_response": false },
+      "WHISPER_PHASE_END": { "require_response": false },
+      "WHISPER_BROADCAST": { "require_response": false }
+    }
+  }
+}

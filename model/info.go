@@ -1,44 +1,72 @@
 package model
 
-import "encoding/json"
+import (
+	"encoding/json"
 
+	"github.com/aiwolfdial/aiwolf-nlp-server/model/wire"
+)
+
+// TalkList・WhisperListはサーバ内部の集計用で、エージェントへは talk_history として別途送る。
 type Info struct {
-	GameID         string           `json:"game_id"`
-	Day            int              `json:"day"`
-	Agent          *Agent           `json:"agent"`
-	Profile        *string          `json:"profile,omitempty"`
-	MediumResult   *Judge           `json:"medium_result,omitempty"`
-	DivineResult   *Judge           `json:"divine_result,omitempty"`
-	ExecutedAgent  *Agent           `json:"executed_agent,omitempty"`
-	AttackedAgent  *Agent           `json:"attacked_agent,omitempty"`
-	VoteList       []Vote           `json:"vote_list,omitempty"`
-	AttackVoteList []Vote           `json:"attack_vote_list,omitempty"`
-	TalkList       []Talk           `json:"-"`
-	WhisperList    []Talk           `json:"-"`
-	StatusMap      map[Agent]Status `json:"status_map"`
-	RoleMap        map[Agent]Role   `json:"role_map"`
-	RemainCount    *int             `json:"remain_count,omitempty"`
-	RemainLength   *int             `json:"remain_length,omitempty"`
-	RemainSkip     *int             `json:"remain_skip,omitempty"`
+	GameID         string
+	Day            int
+	Agent          *Agent
+	Profile        *string
+	MediumResult   *Judge
+	DivineResult   *Judge
+	ExecutedAgent  *Agent
+	AttackedAgent  *Agent
+	VoteList       []Vote
+	AttackVoteList []Vote
+	TalkList       []Talk
+	WhisperList    []Talk
+	StatusMap      map[Agent]Status
+	RoleMap        map[Agent]Role
+	RemainCount    *int
+	RemainLength   *int
+	RemainSkip     *int
+}
+
+func (i Info) wire() wire.Info {
+	statusMap := make(map[string]wire.Status, len(i.StatusMap))
+	for agent, status := range i.StatusMap {
+		statusMap[agent.String()] = wire.Status(status)
+	}
+	roleMap := make(map[string]wire.Role, len(i.RoleMap))
+	for agent, role := range i.RoleMap {
+		roleMap[agent.String()] = wire.Role(role.Name)
+	}
+	agent := ""
+	if i.Agent != nil {
+		agent = i.Agent.String()
+	}
+	return wire.Info{
+		GameID:         i.GameID,
+		Day:            i.Day,
+		Agent:          agent,
+		Profile:        i.Profile,
+		MediumResult:   wireJudge(i.MediumResult),
+		DivineResult:   wireJudge(i.DivineResult),
+		ExecutedAgent:  wireAgentName(i.ExecutedAgent),
+		AttackedAgent:  wireAgentName(i.AttackedAgent),
+		VoteList:       wireVotes(i.VoteList),
+		AttackVoteList: wireVotes(i.AttackVoteList),
+		StatusMap:      statusMap,
+		RoleMap:        roleMap,
+		RemainCount:    i.RemainCount,
+		RemainLength:   i.RemainLength,
+		RemainSkip:     i.RemainSkip,
+	}
 }
 
 func (i Info) MarshalJSON() ([]byte, error) {
-	statusMap := make(map[string]Status)
-	for k, v := range i.StatusMap {
-		statusMap[k.String()] = v
+	return json.Marshal(i.wire())
+}
+
+func wireAgentName(agent *Agent) *string {
+	if agent == nil {
+		return nil
 	}
-	roleMap := make(map[string]Role)
-	for k, v := range i.RoleMap {
-		roleMap[k.String()] = v
-	}
-	type Alias Info
-	return json.Marshal(&struct {
-		*Alias
-		StatusMap map[string]Status `json:"status_map"`
-		RoleMap   map[string]Role   `json:"role_map"`
-	}{
-		Alias:     (*Alias)(&i),
-		StatusMap: statusMap,
-		RoleMap:   roleMap,
-	})
+	name := agent.String()
+	return &name
 }

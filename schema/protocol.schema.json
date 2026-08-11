@@ -1,0 +1,574 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiwolfdial.github.io/aiwolf-nlp/schema/protocol.schema.json",
+  "title": "aiwolf-nlp protocol",
+  "description": "サーバがエージェントへ送信するパケットの構造.",
+  "x-description-en": "Structure of the packets the server sends to agents.",
+  "$ref": "#/$defs/Packet",
+  "$defs": {
+    "Packet": {
+      "type": "object",
+      "description": "パケットの構造体.",
+      "x-description-en": "Packet structure.",
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/Request",
+          "description": "リクエストの種類.",
+          "x-description-en": "Type of request."
+        },
+        "info": {
+          "$ref": "#/$defs/Info",
+          "description": "ゲームの現状態を示す情報.",
+          "x-description-en": "Information indicating the current state of the game."
+        },
+        "setting": {
+          "$ref": "#/$defs/Setting",
+          "description": "ゲームの設定情報.",
+          "x-description-en": "Game setting information."
+        },
+        "talk_history": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Talk"
+          },
+          "description": "トークの履歴を示す情報.",
+          "x-description-en": "History of talks."
+        },
+        "whisper_history": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Talk"
+          },
+          "description": "囁きの履歴を示す情報.",
+          "x-description-en": "History of whispers."
+        },
+        "new_talk": {
+          "$ref": "#/$defs/Talk",
+          "description": "グループチャット方式でブロードキャストされた新しいトーク. (リクエストの種類が TALK_BROADCAST の場合のみ).",
+          "x-description-en": "Newly broadcast talk in group chat mode. (Only for `TALK_BROADCAST` requests)."
+        },
+        "new_whisper": {
+          "$ref": "#/$defs/Talk",
+          "description": "グループチャット方式でブロードキャストされた新しい囁き. (リクエストの種類が WHISPER_BROADCAST の場合のみ).",
+          "x-description-en": "Newly broadcast whisper in group chat mode. (Only for `WHISPER_BROADCAST` requests)."
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "Info": {
+      "type": "object",
+      "description": "パケット内のゲームの現状態を示す情報の構造体.",
+      "x-description-en": "The structure that contains information about the current state of the game within the packet.",
+      "properties": {
+        "game_id": {
+          "type": "string",
+          "description": "ゲームの識別子.",
+          "x-description-en": "Game identifier."
+        },
+        "day": {
+          "type": "integer",
+          "description": "現在の日数.",
+          "x-description-en": "Current day."
+        },
+        "agent": {
+          "type": "string",
+          "description": "自分のエージェントの名前.",
+          "x-description-en": "The name of the agent."
+        },
+        "profile": {
+          "type": "string",
+          "description": "自分のエージェントのプロフィール. (リクエストの種類が INITIALIZE の場合のみ). 設定されない場合は None.",
+          "x-description-en": "The agent's profile. (Only for `INITIALIZE` request). If not set, it is None."
+        },
+        "medium_result": {
+          "$ref": "#/$defs/Judge",
+          "description": "霊媒師の結果 (エージェントの役職が霊媒師であるかつ霊媒結果が設定されている場合のみ).",
+          "x-description-en": "The result of the medium (only if the agent's role is Medium and the result is set)."
+        },
+        "divine_result": {
+          "$ref": "#/$defs/Judge",
+          "description": "占い師の結果 (エージェントの役職が占い師であるかつ占い結果が設定されている場合のみ).",
+          "x-description-en": "The result of the divination (only if the agent's role is Seer and the result is set)."
+        },
+        "executed_agent": {
+          "type": "string",
+          "description": "昨日の追放結果 (エージェントが追放された場合のみ).",
+          "x-description-en": "The result of the previous day's exile (only if an agent was exiled)."
+        },
+        "attacked_agent": {
+          "type": "string",
+          "description": "昨夜の襲撃結果 (エージェントが襲撃された場合のみ).",
+          "x-description-en": "The result of the previous night's attack (only if an agent was attacked)."
+        },
+        "vote_list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vote"
+          },
+          "description": "投票の結果 (投票結果が公開されている場合のみ).",
+          "x-description-en": "The results of the votes (only if vote results are public)."
+        },
+        "attack_vote_list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Vote"
+          },
+          "description": "襲撃の投票結果 (エージェントの役職が人狼かつ襲撃投票結果が公開されている場合のみ).",
+          "x-description-en": "The results of the attack votes (only if the agent's role is Werewolf and the attack vote results are public)."
+        },
+        "status_map": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Status"
+          },
+          "description": "各エージェントの生存状態を示すマップ.",
+          "x-description-en": "A map showing the survival status of each agent."
+        },
+        "role_map": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/Role"
+          },
+          "description": "各エージェントの役職を示すマップ (自分以外のエージェントの役職は見えません).",
+          "x-description-en": "A map showing the roles of each agent (roles of agents other than oneself are not visible)."
+        },
+        "remain_count": {
+          "type": "integer",
+          "description": "残りのトークもしくは囁きリクエストを受信する可能性のある最大の回数. (リクエストの種類が TALK | WHISPER の場合のみ).",
+          "x-description-en": "The maximum number of remaining possible talk or whisper requests (only for `TALK` or `WHISPER` requests)."
+        },
+        "remain_length": {
+          "type": "integer",
+          "description": "残りのトークもしくは囁きリクエストで消費することのできる文字数. 最低文字数を除く. (リクエストの種類が TALK | WHISPER の場合のみ). 制限がない場合は None.",
+          "x-description-en": "The maximum number of characters that can be consumed by remaining talk or whisper requests, excluding the minimum character count. If no limit, set to None."
+        },
+        "remain_skip": {
+          "type": "integer",
+          "description": "残りのトークもしくは囁きリクエストでスキップすることのできる回数. (リクエストの種類が TALK | WHISPER の場合のみ).",
+          "x-description-en": "The number of remaining skips allowed for talk or whisper requests (only for `TALK` or `WHISPER` requests)."
+        }
+      },
+      "required": [
+        "game_id",
+        "day",
+        "agent",
+        "status_map",
+        "role_map"
+      ],
+      "additionalProperties": false
+    },
+    "Judge": {
+      "type": "object",
+      "description": "占い結果や霊媒結果などの判定結果を示す情報の構造体.",
+      "x-description-en": "The structure that contains the results of divinations or medium results.",
+      "properties": {
+        "day": {
+          "type": "integer",
+          "description": "判定が出た日数.",
+          "x-description-en": "The day the judgment was made."
+        },
+        "agent": {
+          "type": "string",
+          "description": "判定を出したエージェントの名前.",
+          "x-description-en": "The agent who made the judgment."
+        },
+        "target": {
+          "type": "string",
+          "description": "判定の対象となったエージェントの名前.",
+          "x-description-en": "The agent who was judged."
+        },
+        "result": {
+          "$ref": "#/$defs/Species",
+          "description": "判定結果.",
+          "x-description-en": "The result of the judgment."
+        }
+      },
+      "required": [
+        "day",
+        "agent",
+        "target",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "Vote": {
+      "type": "object",
+      "description": "投票の内容を示す情報の構造体.",
+      "x-description-en": "The structure that contains the content of a vote.",
+      "properties": {
+        "day": {
+          "type": "integer",
+          "description": "投票が行われた日数.",
+          "x-description-en": "The day the vote took place."
+        },
+        "agent": {
+          "type": "string",
+          "description": "投票を行ったエージェントの名前.",
+          "x-description-en": "The agent who cast the vote."
+        },
+        "target": {
+          "type": "string",
+          "description": "投票の対象となったエージェントの名前.",
+          "x-description-en": "The agent who was voted on."
+        }
+      },
+      "required": [
+        "day",
+        "agent",
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "Talk": {
+      "type": "object",
+      "description": "会話の内容を示す情報の構造体.",
+      "x-description-en": "The structure that contains the content of the conversation.",
+      "properties": {
+        "idx": {
+          "type": "integer",
+          "description": "会話のインデックス.",
+          "x-description-en": "Index of the conversation."
+        },
+        "day": {
+          "type": "integer",
+          "description": "会話が行われた日数.",
+          "x-description-en": "The day the conversation took place."
+        },
+        "turn": {
+          "type": "integer",
+          "description": "会話が行われたターン数.",
+          "x-description-en": "The turn number when the conversation took place."
+        },
+        "agent": {
+          "type": "string",
+          "description": "会話を行ったエージェントの名前.",
+          "x-description-en": "The name of the agent who spoke."
+        },
+        "text": {
+          "type": "string",
+          "description": "会話の内容.",
+          "x-description-en": "The content of the conversation."
+        },
+        "skip": {
+          "type": "boolean",
+          "description": "会話がスキップであるかどうか.",
+          "x-description-en": "Whether the conversation was skipped."
+        },
+        "over": {
+          "type": "boolean",
+          "description": "会話がオーバーであるかどうか.",
+          "x-description-en": "Whether the conversation was over."
+        },
+        "time": {
+          "type": "integer",
+          "description": "会話が行われた時刻 (Unixミリ秒).",
+          "x-description-en": "The time the conversation took place (Unix milliseconds)."
+        }
+      },
+      "required": [
+        "idx",
+        "day",
+        "turn",
+        "agent",
+        "text",
+        "skip",
+        "over",
+        "time"
+      ],
+      "additionalProperties": false
+    },
+    "Setting": {
+      "type": "object",
+      "description": "ゲームの設定を示す情報の構造体.",
+      "x-description-en": "The structure that contains the game settings.",
+      "properties": {
+        "agent_count": {
+          "type": "integer",
+          "description": "ゲームのプレイヤー数.",
+          "x-description-en": "Number of players in the game."
+        },
+        "max_day": {
+          "type": "integer",
+          "description": "ゲーム内の最大日数. 制限がない場合は None.",
+          "x-description-en": "Maximum number of days in the game. If no limit, set to None."
+        },
+        "role_num_map": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "各役職の人数を示すマップ.",
+          "x-description-en": "A map showing the number of each role."
+        },
+        "vote_visibility": {
+          "type": "boolean",
+          "description": "投票の結果を公開するか.",
+          "x-description-en": "Whether to reveal the results of the votes."
+        },
+        "talk": {
+          "$ref": "#/$defs/SettingTalk"
+        },
+        "whisper": {
+          "$ref": "#/$defs/SettingTalk",
+          "description": "囁きの設定.",
+          "x-description-en": "Whisper settings."
+        },
+        "vote": {
+          "$ref": "#/$defs/SettingVote"
+        },
+        "attack_vote": {
+          "$ref": "#/$defs/SettingAttackVote"
+        },
+        "timeout": {
+          "$ref": "#/$defs/SettingTimeout"
+        }
+      },
+      "required": [
+        "agent_count",
+        "role_num_map",
+        "vote_visibility",
+        "talk",
+        "whisper",
+        "vote",
+        "attack_vote",
+        "timeout"
+      ],
+      "additionalProperties": false
+    },
+    "SettingTalk": {
+      "type": "object",
+      "description": "トークの設定.",
+      "x-description-en": "Talk settings.",
+      "properties": {
+        "max_count": {
+          "$ref": "#/$defs/SettingTalkMaxCount"
+        },
+        "max_length": {
+          "$ref": "#/$defs/SettingTalkMaxLength"
+        },
+        "duration": {
+          "type": "integer",
+          "description": "グループチャット方式のフェーズ全体の制限時間 (ミリ秒). 設定されていない場合は None.",
+          "x-description-en": "Total time limit for the group chat phase (in milliseconds). None if not set."
+        },
+        "max_skip": {
+          "type": "integer",
+          "description": "1日あたりの1エージェントの最大スキップ回数.",
+          "x-description-en": "Maximum number of skips per agent per day."
+        }
+      },
+      "required": [
+        "max_count",
+        "max_length",
+        "max_skip"
+      ],
+      "additionalProperties": false
+    },
+    "SettingTalkMaxCount": {
+      "type": "object",
+      "description": "トークの回数の設定.",
+      "x-description-en": "Talk count settings.",
+      "properties": {
+        "per_agent": {
+          "type": "integer",
+          "description": "1日あたりの1エージェントの最大発言回数.",
+          "x-description-en": "Maximum number of speeches per agent per day."
+        },
+        "per_day": {
+          "type": "integer",
+          "description": "1日あたりの全体の発言回数.",
+          "x-description-en": "Maximum number of speeches for all agents per day."
+        }
+      },
+      "required": [
+        "per_agent",
+        "per_day"
+      ],
+      "additionalProperties": false
+    },
+    "SettingTalkMaxLength": {
+      "type": "object",
+      "description": "トークの文字数の設定.",
+      "x-description-en": "Talk length settings.",
+      "properties": {
+        "count_in_word": {
+          "type": "boolean",
+          "description": "単語数でカウントするか. 設定されない場合は None.",
+          "x-description-en": "Whether to count by word count. If not set, it is None."
+        },
+        "count_spaces": {
+          "type": "boolean",
+          "description": "文字数カウントの際に空白を含めてカウントするか. 設定されない場合は None.",
+          "x-description-en": "Whether to include spaces when counting characters. None if not set."
+        },
+        "per_talk": {
+          "type": "integer",
+          "description": "1回のトークあたりの最大文字数. 制限がない場合は None.",
+          "x-description-en": "Maximum number of characters per talk. If no limit, set to None."
+        },
+        "mention_length": {
+          "type": "integer",
+          "description": "1回のトークあたりのメンションを含む場合の追加文字数. 制限がない場合は None.",
+          "x-description-en": "Additional character count when mentioning another agent in a talk. If no limit, set to None."
+        },
+        "per_agent": {
+          "type": "integer",
+          "description": "1日あたりの1エージェントの最大文字数. 制限がない場合は None.",
+          "x-description-en": "Maximum number of characters per agent per day. If no limit, set to None."
+        },
+        "base_length": {
+          "type": "integer",
+          "description": "1日あたりの1エージェントの最大文字数に含まない最低文字数. 制限がない場合は None.",
+          "x-description-en": "Minimum number of characters not included in the daily character limit per agent. If no limit, set to None."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "SettingVote": {
+      "type": "object",
+      "description": "投票の設定.",
+      "x-description-en": "Vote settings.",
+      "properties": {
+        "max_count": {
+          "type": "integer",
+          "description": "1位タイの場合の最大再投票回数.",
+          "x-description-en": "Maximum number of re-votes allowed in case of a tie for first place."
+        },
+        "allow_self_vote": {
+          "type": "boolean",
+          "description": "自己投票を許可するか.",
+          "x-description-en": "Whether self-voting is allowed."
+        }
+      },
+      "required": [
+        "max_count",
+        "allow_self_vote"
+      ],
+      "additionalProperties": false
+    },
+    "SettingAttackVote": {
+      "type": "object",
+      "description": "襲撃投票の設定.",
+      "x-description-en": "Attack vote settings.",
+      "properties": {
+        "max_count": {
+          "type": "integer",
+          "description": "1位タイの場合の最大襲撃再投票回数.",
+          "x-description-en": "Maximum number of re-votes allowed for attacks in case of a tie for first place."
+        },
+        "allow_self_vote": {
+          "type": "boolean",
+          "description": "自己投票を許可するか.",
+          "x-description-en": "Whether self-voting is allowed for attacks."
+        },
+        "allow_no_target": {
+          "type": "boolean",
+          "description": "襲撃なしの日を許可するか.",
+          "x-description-en": "Whether to allow a day with no target for an attack."
+        }
+      },
+      "required": [
+        "max_count",
+        "allow_self_vote",
+        "allow_no_target"
+      ],
+      "additionalProperties": false
+    },
+    "SettingTimeout": {
+      "type": "object",
+      "description": "タイムアウトの設定.",
+      "x-description-en": "Timeout settings.",
+      "properties": {
+        "action": {
+          "type": "integer",
+          "description": "エージェントのアクションのタイムアウト時間 (ミリ秒).",
+          "x-description-en": "Timeout duration for agent actions (in milliseconds)."
+        },
+        "response": {
+          "type": "integer",
+          "description": "エージェントの生存確認のタイムアウト時間 (ミリ秒).",
+          "x-description-en": "Timeout duration for agent survival checks (in milliseconds)."
+        }
+      },
+      "required": [
+        "action",
+        "response"
+      ],
+      "additionalProperties": false
+    },
+    "Request": {
+      "type": "string",
+      "description": "リクエストの種類を示す列挙型.",
+      "x-description-en": "An enumeration representing the type of request.",
+      "enum": [
+        "NAME",
+        "TALK",
+        "WHISPER",
+        "VOTE",
+        "DIVINE",
+        "GUARD",
+        "ATTACK",
+        "INITIALIZE",
+        "DAILY_INITIALIZE",
+        "DAILY_FINISH",
+        "FINISH",
+        "TALK_PHASE_START",
+        "TALK_PHASE_END",
+        "TALK_BROADCAST",
+        "WHISPER_PHASE_START",
+        "WHISPER_PHASE_END",
+        "WHISPER_BROADCAST"
+      ]
+    },
+    "Role": {
+      "type": "string",
+      "description": "役職を示す列挙型.",
+      "x-description-en": "An enumeration representing the role of an agent.",
+      "enum": [
+        "WEREWOLF",
+        "POSSESSED",
+        "SEER",
+        "BODYGUARD",
+        "VILLAGER",
+        "MEDIUM"
+      ]
+    },
+    "Species": {
+      "type": "string",
+      "description": "種族を示す列挙型.",
+      "x-description-en": "An enumeration that represents species.",
+      "enum": [
+        "HUMAN",
+        "WEREWOLF"
+      ]
+    },
+    "Team": {
+      "type": "string",
+      "description": "陣営を示す列挙型.",
+      "x-description-en": "An enumeration representing a team.",
+      "enum": [
+        "VILLAGER",
+        "WEREWOLF"
+      ]
+    },
+    "Status": {
+      "type": "string",
+      "description": "エージェントの生存状態を示す列挙型.",
+      "x-description-en": "An enumeration representing the survival status of an agent.",
+      "enum": [
+        "ALIVE",
+        "DEAD"
+      ]
+    }
+  }
+}

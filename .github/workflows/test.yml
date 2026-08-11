@@ -17,6 +17,12 @@ jobs:
           go-version: 1.25.x
       - name: Install dependencies
         run: go get .
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Check generated files are up to date
+        run: ./schema/generate.sh --check
       - name: Build
         run: go build -race -ldflags "-X main.version=$(git describe --tag --abbrev=0) -X main.revision=$(git rev-list -1 HEAD) -X main.build=$(git describe --tags)" -v ./...
       - name: Test with the Go CLI
