@@ -98,6 +98,48 @@ func TestRepeatedFatalsQuarantineTeam(t *testing.T) {
 	}
 }
 
+// 隔離中に更に失敗しても期限は延びない。延びると失敗が失敗を呼んで復帰できなくなる。
+func TestQuarantineDeadlineIsNotExtended(t *testing.T) {
+	tracker, now := newFixed(t, model.TeamHealthConfig{
+		MinGames:           1,
+		QuarantineRate:     0.1,
+		QuarantineDuration: 10 * time.Minute,
+	})
+	fail := func(id string) []Snapshot {
+		tracker.OnGameStart(id, agents("alpha"), model.GameState{})
+		tracker.OnAgentFatal(id, model.AgentView{TeamName: "alpha"}, errors.New("切断"))
+		return tracker.FinishGame(id, true).Quarantined
+	}
+
+	first := fail("g1")
+	if len(first) != 1 || first[0].QuarantinedUntil == nil {
+		t.Fatalf("隔離されませんでした: %v", first)
+	}
+	deadline := *first[0].QuarantinedUntil
+
+	// 隔離中に更に失敗させる。通知は繰り返さず、期限も動かないこと。
+	*now = now.Add(5 * time.Minute)
+	if again := fail("g2"); len(again) != 0 {
+		t.Fatalf("隔離中に通知が繰り返されました: %v", again)
+	}
+	snap, _ := tracker.Get("alpha")
+	if snap.QuarantinedUntil == nil || *snap.QuarantinedUntil != deadline {
+		t.Fatalf("隔離の期限が延長されました: %v -> %v", deadline, snap.QuarantinedUntil)
+	}
+	if snap.QuarantineCount != 1 {
+		t.Fatalf("隔離回数が二重に数えられています: %v", snap.QuarantineCount)
+	}
+
+	// 期限を過ぎれば復帰し、その後の失敗で改めて隔離される。
+	*now = now.Add(6 * time.Minute)
+	if tracker.IsQuarantined("alpha") {
+		t.Fatal("期限を過ぎても復帰しません")
+	}
+	if len(fail("g3")) != 1 {
+		t.Fatal("復帰後の失敗で再隔離されませんでした")
+	}
+}
+
 // 重みは weight_floor より下がらない。0 にすると事実上の永久除外になるため。
 func TestWeightFloorIsRespected(t *testing.T) {
 	tracker, _ := newFixed(t, model.TeamHealthConfig{

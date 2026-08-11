@@ -234,6 +234,18 @@ func (mo *MatchOptimizer) hasQuarantinedTeam(teams map[model.Role][]string) bool
 	return false
 }
 
+// Teams は対戦表に登録済みのチーム名を返す。接続していないチームを割り出すのに使う。
+func (mo *MatchOptimizer) Teams() []string {
+	mo.mu.RLock()
+	defer mo.mu.RUnlock()
+	teams := make([]string, 0, len(mo.IdxTeamMap))
+	for _, team := range mo.IdxTeamMap {
+		teams = append(teams, team)
+	}
+	sort.Strings(teams)
+	return teams
+}
+
 // Progress は消化済みと予定の試合数を返す。進捗通知と REST API が読む。
 func (mo *MatchOptimizer) Progress() (done int, total int) {
 	mo.mu.RLock()

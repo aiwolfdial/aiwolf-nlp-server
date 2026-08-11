@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"math"
 	"strings"
 )
@@ -63,10 +64,6 @@ func contextBlock(text string) slackBlock {
 	return slackBlock{Type: "context", Elements: []slackText{mrkdwn(text)}}
 }
 
-func dividerBlock() slackBlock {
-	return slackBlock{Type: "divider"}
-}
-
 // 進捗を塗りつぶしブロックで描く。Slack は本文がプロポーショナルフォントなので、
 // 桁が揃うようインラインコードで囲んで等幅で表示させる。
 func progressBar(ratio float64, cells int) string {
@@ -78,6 +75,22 @@ func progressBar(ratio float64, cells int) string {
 	}
 	filled := int(math.Round(float64(cells) * ratio))
 	return "`" + strings.Repeat("█", filled) + strings.Repeat("░", cells-filled) + "`"
+}
+
+// 1フィールドあたりの上限は2000文字。チーム数が多くても本文が壊れないよう頭から切る。
+const maxTeamsInField = 20
+
+// チーム名を1行に並べる。空のときに欄が消えると「0件」なのか「取れていない」のか
+// 区別できないため、必ず何か書く。
+func teamList(teams []string) string {
+	if len(teams) == 0 {
+		return "_なし_"
+	}
+	if len(teams) <= maxTeamsInField {
+		return strings.Join(teams, ", ")
+	}
+	return strings.Join(teams[:maxTeamsInField], ", ") +
+		fmt.Sprintf(" ほか %d チーム", len(teams)-maxTeamsInField)
 }
 
 func ratioOf(done, total int) float64 {

@@ -164,7 +164,8 @@ func (n *SlackNotifier) NotifyTeamQuarantined(snapshots []teamhealth.Snapshot) {
 		detail := fmt.Sprintf("直近 %d 試合  ・  脱落 %d  ・  異常終了 %d  ・  応答エラー %d 件",
 			s.Games, s.FatalGames, s.AbortedGames, s.RequestErrors)
 		if s.QuarantinedUntil != nil {
-			detail += fmt.Sprintf("  ・  解除予定 %s", time.Unix(*s.QuarantinedUntil, 0).Format("15:04:05"))
+			// 期限は延長されないので「予定」ではなく確定した時刻として書く。
+			detail += fmt.Sprintf("  ・  %s に自動解除", time.Unix(*s.QuarantinedUntil, 0).Format("15:04:05"))
 		}
 		blocks = append(blocks, contextBlock(detail))
 	}
@@ -198,19 +199,22 @@ func (n *SlackNotifier) NotifyGameAborted(gameID string, teams []string, fatalTe
 	n.enqueue(EventAbort, summary, colorDanger, blocks...)
 }
 
-func (n *SlackNotifier) NotifyMatchmakingStalled(idle time.Duration, waiting []string) {
+// NotifyMatchmakingStalled は接続済みのチームと、対戦表に載っているのに接続していない
+// チームを並べる。マッチが組めない原因は後者にあるため、両方を分けて出す。
+func (n *SlackNotifier) NotifyMatchmakingStalled(idle time.Duration, connected []string, awaiting []string) {
 	if n == nil {
 		return
 	}
-	blocks := []slackBlock{sectionBlock(fmt.Sprintf(
-		":hourglass: *マッチが %s 成立していません*", idle.Round(time.Second)))}
-	if len(waiting) > 0 {
-		blocks = append(blocks, contextBlock(fmt.Sprintf(
-			"待機中 %d チーム: %s", len(waiting), strings.Join(waiting, ", "))))
-	} else {
-		blocks = append(blocks, contextBlock("待機部屋は空です"))
+	blocks := []slackBlock{
+		sectionBlock(fmt.Sprintf(":hourglass: *マッチが %s 成立していません*", idle.Round(time.Second))),
+		fieldsBlock(
+			fmt.Sprintf(":large_green_circle: *接続中* (%d)\n%s", len(connected), teamList(connected)),
+			fmt.Sprintf(":white_circle: *接続待ち* (%d)\n%s", len(awaiting), teamList(awaiting)),
+		),
 	}
-	n.enqueue(EventStall, fmt.Sprintf("マッチが %s 成立していません", idle.Round(time.Second)), colorWarning, blocks...)
+	summary := fmt.Sprintf("マッチが %s 成立していません (接続中 %d / 接続待ち %d)",
+		idle.Round(time.Second), len(connected), len(awaiting))
+	n.enqueue(EventStall, summary, colorWarning, blocks...)
 }
 
 // NotifyProgress は消化率をバーで示す。数字だけだと残量が直感的に掴めないため。

@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"log/slog"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,7 +19,7 @@ import (
 type Notifier interface {
 	NotifyGameAborted(gameID string, teams []string, fatalTeams []string)
 	NotifyTeamQuarantined(snapshots []teamhealth.Snapshot)
-	NotifyMatchmakingStalled(idle time.Duration, waiting []string)
+	NotifyMatchmakingStalled(idle time.Duration, connected []string, awaiting []string)
 	NotifyProgress(done int, total int, active int)
 }
 
@@ -194,10 +195,32 @@ func (m *GameManager) checkStall(threshold time.Duration) {
 	if idle < threshold {
 		return
 	}
-	waiting := m.waitingRoom.Teams()
-	slog.Warn("マッチが成立していません", "idle", idle.String(), "waiting", len(waiting))
+	connected, awaiting := m.waitingTeams()
+	slog.Warn("マッチが成立していません", "idle", idle.String(),
+		"connected", len(connected), "awaiting", len(awaiting))
 	m.stallNotified.Store(true)
-	m.obs.Notifier.NotifyMatchmakingStalled(idle, waiting)
+	m.obs.Notifier.NotifyMatchmakingStalled(idle, connected, awaiting)
+}
+
+// 待機部屋にいるチームと、対戦表に載っているのに接続していないチームに分ける。
+// マッチが組めない原因は後者にあるため、名前が分からないと対応できない。
+func (m *GameManager) waitingTeams() (connected []string, awaiting []string) {
+	connected = m.waitingRoom.Teams()
+	sort.Strings(connected)
+	if m.matchOptimizer == nil {
+		// 対戦表が無い場合は名簿そのものが存在せず、誰を待っているかを特定できない。
+		return connected, nil
+	}
+	present := make(map[string]bool, len(connected))
+	for _, team := range connected {
+		present[team] = true
+	}
+	for _, team := range m.matchOptimizer.Teams() {
+		if !present[team] {
+			awaiting = append(awaiting, team)
+		}
+	}
+	return connected, awaiting
 }
 
 func (m *GameManager) ActiveCount() int {

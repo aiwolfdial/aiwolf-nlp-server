@@ -195,7 +195,8 @@ func (t *Tracker) FinishGame(id string, abortedByError bool) GameOutcome {
 		if len(st.records) > t.config.Window {
 			st.records = st.records[len(st.records)-t.config.Window:]
 		}
-		// 隔離中に更に失敗しても期限を延ばすだけで、通知は入り口の一度だけにする。
+		// 隔離中の失敗は記録するだけで期限を延ばさない。延ばすと失敗が失敗を呼んで
+		// 復帰できなくなるため、必ず一度は復帰させて直近の成績で再評価する。
 		if st.quarantinedUntil.After(now) {
 			continue
 		}

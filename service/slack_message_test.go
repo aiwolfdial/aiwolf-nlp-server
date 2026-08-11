@@ -35,6 +35,24 @@ func TestProgressBarFill(t *testing.T) {
 	}
 }
 
+// 空欄を消してしまうと「0件」なのか「取得できていない」のか読み手が区別できない。
+func TestTeamListIsNeverEmpty(t *testing.T) {
+	if got := teamList(nil); got == "" {
+		t.Fatal("チームが0件のときに空文字になりました")
+	}
+}
+
+func TestTeamListTruncatesLongLists(t *testing.T) {
+	teams := make([]string, maxTeamsInField+5)
+	for i := range teams {
+		teams[i] = "team"
+	}
+	got := teamList(teams)
+	if !strings.Contains(got, "ほか 5 チーム") {
+		t.Fatalf("打ち切りの表示がありません: %s", got)
+	}
+}
+
 func TestRatioOfHandlesZeroTotal(t *testing.T) {
 	if got := ratioOf(3, 0); got != 0 {
 		t.Fatalf("総数0のとき比率が %v になりました", got)

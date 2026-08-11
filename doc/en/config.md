@@ -236,7 +236,9 @@ Because match-level and team-level failures are expressed on the same weight, th
 - `weight_floor`: The lower bound of a team's weight.
   Setting it to 0 amounts to permanent exclusion, so a value greater than 0 is normally specified.
 - `quarantine_rate`: The failure rate threshold at which quarantine begins.
-- `quarantine_duration`: How long until the quarantine is lifted.
+- `quarantine_duration`: How long after quarantining until it is lifted automatically.
+  Further failures while quarantined do not extend the deadline. Extending it would let failures beget failures with no way back, so the team is always released once and re-evaluated on its recent record.\
+  If failures remain within the window after release, the result of the next game quarantines it again.
   Matches containing a quarantined team are removed from the matchmaking candidates and the team returns automatically once the period expires.\
   However, if no candidate would remain, the quarantine is ignored to avoid making games impossible to form.
 
@@ -276,6 +278,8 @@ Progress and failure rates are shown as bars. The bars are wrapped in inline cod
   - `stall`: When no match has been formed for a certain period.
   - `milestone`: Server startup and shutdown, plus progress every so many games.
 - `stall_threshold`: Notify when no match has been formed for this long.
-  Only evaluated when there are no games in progress. If 0, stall monitoring is disabled.
+  Only evaluated when there are no games in progress. If 0, stall monitoring is disabled.\
+  The notification separates the teams present in the waiting room ("connected") from those listed in the schedule but not connected ("awaiting").\
+  The latter is where the reason a match cannot form lies, but since the roster comes from the schedule, only the connected teams can be shown when `matching.is_optimize` is `false`.
 - `milestone_every`: How many games between progress notifications.
   If 0, progress notifications are disabled.
