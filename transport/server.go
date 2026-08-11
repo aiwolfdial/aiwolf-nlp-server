@@ -123,7 +123,8 @@ func (s *Server) Run() {
 		sig := <-trap
 		slog.Info("シグナルを受信しました", "signal", sig)
 		s.manager.BeginShutdown()
-		s.slackNotifier.NotifyServerEvent(":octagonal_sign: *シャットダウンを開始しました* signal=" + sig.String())
+		s.slackNotifier.NotifyServerEvent(":octagonal_sign:", "シャットダウンを開始しました",
+			"signal="+sig.String()+"  ・  進行中のゲームの終了を待ちます")
 		s.manager.WaitAllFinished()
 		// 送信ワーカが最後の通知を投げ終えるのを待たずに落とすと通知が消える。
 		s.slackNotifier.Close()
@@ -132,7 +133,9 @@ func (s *Server) Run() {
 
 	s.manager.StartWatchdog()
 	slog.Info("サーバを起動しました", "host", s.config.Server.WebSocket.Host, "port", s.config.Server.WebSocket.Port)
-	s.slackNotifier.NotifyServerEvent(":rocket: *サーバを起動しました* " + s.config.Server.WebSocket.Host + ":" + strconv.Itoa(s.config.Server.WebSocket.Port))
+	s.slackNotifier.NotifyServerEvent(":rocket:", "サーバを起動しました",
+		s.config.Server.WebSocket.Host+":"+strconv.Itoa(s.config.Server.WebSocket.Port)+
+			"  ・  "+Version.Version+"  ・  "+strconv.Itoa(s.config.Game.AgentCount)+"人村")
 	err := router.Run(s.config.Server.WebSocket.Host + ":" + strconv.Itoa(s.config.Server.WebSocket.Port))
 	if err != nil {
 		slog.Error("サーバの起動に失敗しました", "error", err)

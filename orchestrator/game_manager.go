@@ -19,7 +19,7 @@ type Notifier interface {
 	NotifyGameAborted(gameID string, teams []string, fatalTeams []string)
 	NotifyTeamQuarantined(snapshots []teamhealth.Snapshot)
 	NotifyMatchmakingStalled(idle time.Duration, waiting []string)
-	NotifyProgress(done int, total int)
+	NotifyProgress(done int, total int, active int)
 }
 
 // 監視まわりの差し込み。すべて任意で、未設定なら従来どおりの挙動になる。
@@ -167,7 +167,7 @@ func (m *GameManager) notifyMilestone() {
 	}
 	m.lastMilestone = done
 	m.milestoneMu.Unlock()
-	m.obs.Notifier.NotifyProgress(done, total)
+	m.obs.Notifier.NotifyProgress(done, total, m.ActiveCount())
 }
 
 // StartWatchdog はマッチが成立しない状態が続いていないかを定期的に確認する。

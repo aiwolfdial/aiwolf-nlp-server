@@ -253,6 +253,15 @@ Because match-level and team-level failures are expressed on the same weight, th
 > Sends events that an operator needs to notice to a Slack Incoming Webhook.\
 > Sending is done by a dedicated goroutine, so delays or outages on the Slack side never stall the game.
 
+Notifications are built with Block Kit and distinguish severity by a color bar (green = progress, yellow = quarantine and stall, red = abort, blue = startup and shutdown).\
+Progress and failure rates are shown as bars. The bars are wrapped in inline code so the columns stay aligned.
+
+```
+:chart_with_upwards_trend: Progress  15 / 28 games
+███████████░░░░░░░░░  53.6%
+13 left  -  1 in progress
+```
+
 - `enable`: Whether to enable Slack notifications.
 - `webhook_url`: The Incoming Webhook URL.
   If empty, the `SLACK_WEBHOOK_URL` environment variable is used. Since the URL is a secret, using the environment variable rather than writing it directly in the config file is recommended.

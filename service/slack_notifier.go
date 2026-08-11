@@ -33,7 +33,7 @@ type SlackNotifier struct {
 	webhook  string
 	events   map[string]bool
 	client   *http.Client
-	queue    chan string
+	queue    chan slackPayload
 	done     chan struct{}
 	closeOne sync.Once
 }
@@ -69,7 +69,7 @@ func NewSlackNotifier(config model.SlackNotifierConfig) *SlackNotifier {
 		webhook: webhook,
 		events:  events,
 		client:  &http.Client{Timeout: config.Timeout},
-		queue:   make(chan string, slackQueueSize),
+		queue:   make(chan slackPayload, slackQueueSize),
 		done:    make(chan struct{}),
 	}
 	go n.run()
@@ -90,31 +90,34 @@ func (n *SlackNotifier) enabled(event string) bool {
 
 func (n *SlackNotifier) run() {
 	defer close(n.done)
-	for text := range n.queue {
-		n.post(text)
+	for payload := range n.queue {
+		n.post(payload)
 		// Webhook の流量制限に当たらないよう、送信の間隔を空ける。
 		time.Sleep(n.config.MinInterval)
 	}
 }
 
-func (n *SlackNotifier) enqueue(event string, text string) {
+// summary はモバイルのプッシュ通知に出る文言なので、装飾を含めない平文にする。
+func (n *SlackNotifier) enqueue(event string, summary string, color string, blocks ...slackBlock) {
 	if !n.enabled(event) {
 		return
 	}
+	payload := slackPayload{
+		Username:    n.config.Username,
+		IconEmoji:   n.config.IconEmoji,
+		Text:        summary,
+		Attachments: []slackAttachment{{Color: color, Blocks: blocks}},
+	}
 	select {
-	case n.queue <- text:
+	case n.queue <- payload:
 	default:
 		// 送信が詰まってもゲームの進行を止めないため、溢れた通知は捨てる。
 		slog.Warn("Slack通知のキューが一杯のため破棄しました", "event", event)
 	}
 }
 
-func (n *SlackNotifier) post(text string) {
-	body, err := json.Marshal(map[string]string{
-		"text":       text,
-		"username":   n.config.Username,
-		"icon_emoji": n.config.IconEmoji,
-	})
+func (n *SlackNotifier) post(payload slackPayload) {
+	body, err := json.Marshal(payload)
 	if err != nil {
 		slog.Error("Slack通知の組み立てに失敗しました", "error", err)
 		return
@@ -149,61 +152,89 @@ func (n *SlackNotifier) NotifyTeamQuarantined(snapshots []teamhealth.Snapshot) {
 	if n == nil || len(snapshots) == 0 {
 		return
 	}
-	var b strings.Builder
-	b.WriteString(":warning: *チームを隔離しました*")
-	for _, s := range snapshots {
-		fmt.Fprintf(&b, "\n• `%s`  失敗率 %.0f%%  重み %.2f  (直近%d試合 / 脱落%d / 異常終了%d / 応答エラー%d件)",
-			s.Team, s.FailureRate*100, s.Weight, s.Games, s.FatalGames, s.AbortedGames, s.RequestErrors)
-		if s.QuarantinedUntil != nil {
-			fmt.Fprintf(&b, "  解除予定 %s", time.Unix(*s.QuarantinedUntil, 0).Format("15:04:05"))
-		}
+	blocks := []slackBlock{sectionBlock(":warning: *チームを隔離しました*")}
+	shown := snapshots
+	if len(shown) > maxQuarantineBlocks {
+		shown = shown[:maxQuarantineBlocks]
 	}
-	n.enqueue(EventQuarantine, b.String())
+	for _, s := range shown {
+		blocks = append(blocks, sectionBlock(fmt.Sprintf(
+			"*`%s`*\n%s  失敗率 *%.0f%%*  ・  マッチの重み *%.2f*",
+			s.Team, progressBar(s.FailureRate, 12), s.FailureRate*100, s.Weight)))
+		detail := fmt.Sprintf("直近 %d 試合  ・  脱落 %d  ・  異常終了 %d  ・  応答エラー %d 件",
+			s.Games, s.FatalGames, s.AbortedGames, s.RequestErrors)
+		if s.QuarantinedUntil != nil {
+			detail += fmt.Sprintf("  ・  解除予定 %s", time.Unix(*s.QuarantinedUntil, 0).Format("15:04:05"))
+		}
+		blocks = append(blocks, contextBlock(detail))
+	}
+	if len(shown) < len(snapshots) {
+		blocks = append(blocks, contextBlock(fmt.Sprintf("ほか %d チーム", len(snapshots)-len(shown))))
+	}
+	names := make([]string, 0, len(snapshots))
+	for _, s := range snapshots {
+		names = append(names, s.Team)
+	}
+	n.enqueue(EventQuarantine, "チームを隔離しました: "+strings.Join(names, ", "), colorWarning, blocks...)
 }
 
 func (n *SlackNotifier) NotifyGameAborted(gameID string, teams []string, fatalTeams []string) {
 	if n == nil {
 		return
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, ":x: *ゲームが異常終了しました*\nID: `%s`", gameID)
-	if len(teams) > 0 {
-		fmt.Fprintf(&b, "\n参加: %s", strings.Join(teams, ", "))
-	}
+	blocks := []slackBlock{sectionBlock(":x: *ゲームが異常終了しました*")}
+	dropped := "(特定できず)"
 	if len(fatalTeams) > 0 {
-		fmt.Fprintf(&b, "\n脱落: %s", strings.Join(fatalTeams, ", "))
+		dropped = "*" + strings.Join(fatalTeams, "*, *") + "*"
 	}
-	n.enqueue(EventAbort, b.String())
+	blocks = append(blocks, fieldsBlock("*ゲームID*\n`"+gameID+"`", "*脱落したチーム*\n"+dropped))
+	if len(teams) > 0 {
+		blocks = append(blocks, contextBlock(fmt.Sprintf("参加 %d チーム: %s", len(teams), strings.Join(teams, ", "))))
+	}
+	summary := "ゲームが異常終了しました"
+	if len(fatalTeams) > 0 {
+		summary += " (脱落: " + strings.Join(fatalTeams, ", ") + ")"
+	}
+	n.enqueue(EventAbort, summary, colorDanger, blocks...)
 }
 
 func (n *SlackNotifier) NotifyMatchmakingStalled(idle time.Duration, waiting []string) {
 	if n == nil {
 		return
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, ":hourglass: *マッチが %s 成立していません*", idle.Round(time.Minute))
+	blocks := []slackBlock{sectionBlock(fmt.Sprintf(
+		":hourglass: *マッチが %s 成立していません*", idle.Round(time.Second)))}
 	if len(waiting) > 0 {
-		fmt.Fprintf(&b, "\n待機中 %d チーム: %s", len(waiting), strings.Join(waiting, ", "))
+		blocks = append(blocks, contextBlock(fmt.Sprintf(
+			"待機中 %d チーム: %s", len(waiting), strings.Join(waiting, ", "))))
 	} else {
-		b.WriteString("\n待機部屋は空です")
+		blocks = append(blocks, contextBlock("待機部屋は空です"))
 	}
-	n.enqueue(EventStall, b.String())
+	n.enqueue(EventStall, fmt.Sprintf("マッチが %s 成立していません", idle.Round(time.Second)), colorWarning, blocks...)
 }
 
-func (n *SlackNotifier) NotifyProgress(done int, total int) {
+// NotifyProgress は消化率をバーで示す。数字だけだと残量が直感的に掴めないため。
+func (n *SlackNotifier) NotifyProgress(done int, total int, active int) {
 	if n == nil {
 		return
 	}
-	text := fmt.Sprintf(":chart_with_upwards_trend: *進捗* %d / %d 試合", done, total)
-	if total > 0 {
-		text += fmt.Sprintf(" (%.0f%%)", float64(done)/float64(total)*100)
+	ratio := ratioOf(done, total)
+	blocks := []slackBlock{
+		sectionBlock(fmt.Sprintf(":chart_with_upwards_trend: *進捗*  %d / %d 試合\n%s  *%.1f%%*",
+			done, total, progressBar(ratio, 20), ratio*100)),
+		contextBlock(fmt.Sprintf("残り %d 試合  ・  実行中 %d 試合", max(total-done, 0), active)),
 	}
-	n.enqueue(EventMilestone, text)
+	n.enqueue(EventMilestone, fmt.Sprintf("進捗 %d / %d 試合 (%.1f%%)", done, total, ratio*100), colorGood, blocks...)
 }
 
-func (n *SlackNotifier) NotifyServerEvent(text string) {
+// NotifyServerEvent は起動・シャットダウンなど本文が固定の通知に使う。
+func (n *SlackNotifier) NotifyServerEvent(emoji string, title string, detail string) {
 	if n == nil {
 		return
 	}
-	n.enqueue(EventMilestone, text)
+	blocks := []slackBlock{sectionBlock(emoji + " *" + title + "*")}
+	if detail != "" {
+		blocks = append(blocks, contextBlock(detail))
+	}
+	n.enqueue(EventMilestone, title, colorInfo, blocks...)
 }
