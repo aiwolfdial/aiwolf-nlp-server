@@ -13,16 +13,25 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/util"
 )
 
+// チームごとの信頼度をマッチの重みへ持ち込む入口。observer/teamhealth.Tracker が実装する。
+// マッチ単位の失敗（Weight）とチーム単位の失敗（この係数）を同じ実効重みの上で扱うために挟む。
+type TeamScorer interface {
+	TeamWeight(team string) float64
+	IsQuarantined(team string) bool
+}
+
 type MatchOptimizer struct {
-	mu               sync.RWMutex              `json:"-"`
-	store            store.MatchOptimizerStore `json:"-"`
-	InfiniteLoop     bool                      `json:"infinite_loop"`
-	TeamCount        int                       `json:"team_count"`
-	GameCount        int                       `json:"game_count"`
-	RoleNumMap       map[model.Role]int        `json:"role_num_map"`
-	IdxTeamMap       map[int]string            `json:"idx_team_map"`
-	ScheduledMatches []model.MatchWeight       `json:"scheduled_matches"`
-	EndedMatches     []map[model.Role][]int    `json:"ended_matches"`
+	mu                sync.RWMutex              `json:"-"`
+	store             store.MatchOptimizerStore `json:"-"`
+	scorer            TeamScorer                `json:"-"`
+	abortWeightFactor float64                   `json:"-"`
+	InfiniteLoop      bool                      `json:"infinite_loop"`
+	TeamCount         int                       `json:"team_count"`
+	GameCount         int                       `json:"game_count"`
+	RoleNumMap        map[model.Role]int        `json:"role_num_map"`
+	IdxTeamMap        map[int]string            `json:"idx_team_map"`
+	ScheduledMatches  []model.MatchWeight       `json:"scheduled_matches"`
+	EndedMatches      []map[model.Role][]int    `json:"ended_matches"`
 }
 
 func (mo *MatchOptimizer) MarshalJSON() ([]byte, error) {
@@ -106,6 +115,7 @@ func NewMatchOptimizer(config model.Config) (*MatchOptimizer, error) {
 		return nil, err
 	}
 	mo.store = st
+	mo.abortWeightFactor = config.TeamHealth.AbortWeightFactor
 	mo.save()
 	return &mo, nil
 }
@@ -117,17 +127,29 @@ func NewMatchOptimizerFromConfig(config model.Config) (*MatchOptimizer, error) {
 		return nil, err
 	}
 	mo := &MatchOptimizer{
-		store:        store.NewFileMatchOptimizerStore(config.Matching.OutputPath),
-		InfiniteLoop: config.Matching.InfiniteLoop,
-		TeamCount:    config.Matching.TeamCount,
-		GameCount:    config.Matching.GameCount,
-		RoleNumMap:   roles,
-		IdxTeamMap:   map[int]string{},
+		store:             store.NewFileMatchOptimizerStore(config.Matching.OutputPath),
+		abortWeightFactor: config.TeamHealth.AbortWeightFactor,
+		InfiniteLoop:      config.Matching.InfiniteLoop,
+		TeamCount:         config.Matching.TeamCount,
+		GameCount:         config.Matching.GameCount,
+		RoleNumMap:        roles,
+		IdxTeamMap:        map[int]string{},
 	}
 	mo.initialize()
 	return mo, nil
 }
 
+// SetTeamScorer はチーム単位の信頼度の供給元を差し込む。nil のままなら
+// 従来どおりマッチ単位の Weight だけで優先度が決まる。
+func (mo *MatchOptimizer) SetTeamScorer(scorer TeamScorer) {
+	mo.mu.Lock()
+	defer mo.mu.Unlock()
+	mo.scorer = scorer
+}
+
+// スケジュール済みマッチを優先度の高い順に返す。優先度は保存された Weight に参加チームの
+// 信頼度を掛けた実効重みで、マッチ単位の失敗もチーム単位の失敗も同じ重みの上で表現する。
+// 隔離中のチームを含むマッチは候補から外す。
 func (mo *MatchOptimizer) GetMatches() []map[model.Role][]string {
 	mo.mu.Lock()
 	defer mo.mu.Unlock()
@@ -139,16 +161,81 @@ func (mo *MatchOptimizer) GetMatches() []map[model.Role][]string {
 	}
 	if count == 0 && mo.InfiniteLoop {
 		slog.Info("スケジュールされたマッチがないため、新たに追加します")
-		mo.append()
+		mo.appendLocked()
 	}
-	matches := []map[model.Role][]string{}
+
+	type candidate struct {
+		teams  map[model.Role][]string
+		weight float64
+	}
+	candidates := make([]candidate, 0, len(mo.ScheduledMatches))
 	for _, match := range mo.ScheduledMatches {
-		matches = append(matches, util.IdxMatchToTeamNameMatch(mo.IdxTeamMap, match.RoleIdxs))
+		teams := util.IdxMatchToTeamNameMatch(mo.IdxTeamMap, match.RoleIdxs)
+		candidates = append(candidates, candidate{teams: teams, weight: mo.effectiveWeight(match.Weight, teams)})
 	}
-	sort.Slice(mo.ScheduledMatches, func(i, j int) bool {
-		return mo.ScheduledMatches[i].Weight > mo.ScheduledMatches[j].Weight
-	})
+	// 実効重みの降順で返す。元の実装は組み立てた後に並べ替えていたため、重みが次回の
+	// 呼び出しまで反映されなかった。
+	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].weight > candidates[j].weight })
+
+	matches := []map[model.Role][]string{}
+	excluded := 0
+	for _, c := range candidates {
+		if mo.hasQuarantinedTeam(c.teams) {
+			excluded++
+			continue
+		}
+		matches = append(matches, c.teams)
+	}
+	// 隔離で候補が全部消えるとゲームが二度と成立しないため、そのときだけ隔離を無視する。
+	if len(matches) == 0 && excluded > 0 {
+		slog.Warn("隔離により候補が無くなったため、隔離を無視して全マッチを対象にします", "excluded", excluded)
+		for _, c := range candidates {
+			matches = append(matches, c.teams)
+		}
+	}
 	return matches
+}
+
+// マッチ単位の重みに参加チームの信頼度を掛ける。1チームでも不安定なら全体の優先度が下がる。
+func (mo *MatchOptimizer) effectiveWeight(weight float64, teams map[model.Role][]string) float64 {
+	if mo.scorer == nil {
+		return weight
+	}
+	for _, names := range teams {
+		for _, team := range names {
+			if team == "" {
+				// 未接続でまだ idx_team_map に載っていないチーム。実績が無いので減点しない。
+				continue
+			}
+			weight *= mo.scorer.TeamWeight(team)
+		}
+	}
+	return weight
+}
+
+func (mo *MatchOptimizer) hasQuarantinedTeam(teams map[model.Role][]string) bool {
+	if mo.scorer == nil {
+		return false
+	}
+	for _, names := range teams {
+		for _, team := range names {
+			if team != "" && mo.scorer.IsQuarantined(team) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Progress は消化済みと予定の試合数を返す。進捗通知と REST API が読む。
+func (mo *MatchOptimizer) Progress() (done int, total int) {
+	mo.mu.RLock()
+	defer mo.mu.RUnlock()
+	total = mo.GameCount
+	if total <= 0 {
+		total = len(mo.EndedMatches) + len(mo.ScheduledMatches)
+	}
+	return len(mo.EndedMatches), total
 }
 
 func (mo *MatchOptimizer) UpdateTeam(team string) {
@@ -172,17 +259,16 @@ func (mo *MatchOptimizer) UpdateTeam(team string) {
 
 func (mo *MatchOptimizer) initialize() error {
 	mo.mu.Lock()
+	defer mo.mu.Unlock()
 	slog.Info("マッチオプティマイザを初期化します")
 	mo.EndedMatches = []map[model.Role][]int{}
 	mo.ScheduledMatches = []model.MatchWeight{}
-	mo.mu.Unlock()
-	return mo.append()
+	return mo.appendLocked()
 }
 
-func (mo *MatchOptimizer) append() error {
-	mo.mu.Lock()
-	defer mo.mu.Unlock()
-
+// 呼び出し側が mo.mu を保持している前提。GetMatches から呼ぶため、
+// ここで再度ロックを取ると自己デッドロックになる。
+func (mo *MatchOptimizer) appendLocked() error {
 	theoretical, roles := util.CalcTheoretical(mo.RoleNumMap, mo.GameCount, mo.TeamCount)
 	slog.Info("各役職の理論値を計算しました", "theoretical", theoretical)
 
@@ -235,14 +321,24 @@ func (mo *MatchOptimizer) SetMatchEnd(match map[model.Role][]string) {
 }
 
 func (mo *MatchOptimizer) SetMatchWeight(match map[model.Role][]string, weight float64) {
+	mo.updateWeight(match, func(float64) float64 { return weight })
+}
+
+// PenalizeMatch は異常終了したマッチの重みを下げる。abort_weight_factor が 0 なら
+// 従来どおり一度で最下位まで落ち、0 より大きければ失敗のたびに段階的に下がる。
+func (mo *MatchOptimizer) PenalizeMatch(match map[model.Role][]string) {
+	mo.updateWeight(match, func(current float64) float64 { return current * mo.abortWeightFactor })
+}
+
+func (mo *MatchOptimizer) updateWeight(match map[model.Role][]string, next func(float64) float64) {
 	mo.mu.Lock()
 	defer mo.mu.Unlock()
 	idxMatch := util.TeamNameMatchToIdxMatch(mo.IdxTeamMap, match)
 
 	for i, scheduledMatch := range mo.ScheduledMatches {
 		if scheduledMatch.Equal(model.MatchWeight{RoleIdxs: idxMatch}) {
-			mo.ScheduledMatches[i].Weight = weight
-			slog.Info("スケジュールされたマッチの重みを設定しました", "weight", weight)
+			mo.ScheduledMatches[i].Weight = next(mo.ScheduledMatches[i].Weight)
+			slog.Info("スケジュールされたマッチの重みを更新しました", "weight", mo.ScheduledMatches[i].Weight)
 			mo.save()
 			return
 		}

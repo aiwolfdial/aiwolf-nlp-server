@@ -14,6 +14,7 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer/livestate"
+	"github.com/aiwolfdial/aiwolf-nlp-server/observer/teamhealth"
 	"github.com/aiwolfdial/aiwolf-nlp-server/orchestrator"
 	"github.com/aiwolfdial/aiwolf-nlp-server/service"
 	"github.com/aiwolfdial/aiwolf-nlp-server/util"
@@ -29,6 +30,9 @@ type Server struct {
 	gameLogger          *service.GameLogger
 	realtimeBroadcaster *service.RealtimeBroadcaster
 	ttsBroadcaster      *service.TTSBroadcaster
+	teamHealth          *teamhealth.Tracker
+	slackNotifier       *service.SlackNotifier
+	matchOptimizer      *matchmaking.MatchOptimizer
 }
 
 func NewServer(config model.Config) (*Server, error) {
@@ -57,14 +61,33 @@ func NewServer(config model.Config) (*Server, error) {
 	if config.RealtimeBroadcaster.Enable {
 		server.realtimeBroadcaster = service.NewRealtimeBroadcaster(config)
 	}
+	if config.TeamHealth.Enable {
+		server.teamHealth = teamhealth.New(config.TeamHealth)
+	}
+	server.slackNotifier = service.NewSlackNotifier(config.SlackNotifier)
 	var matchOptimizer *matchmaking.MatchOptimizer
 	if config.Matching.IsOptimize {
 		matchOptimizer, err = matchmaking.NewMatchOptimizer(config)
 		if err != nil {
 			return nil, errors.New("マッチオプティマイザの作成に失敗しました")
 		}
+		// チームの信頼度をマッチの重みへ反映させる。未設定ならマッチ単位の重みだけで動く。
+		if server.teamHealth != nil {
+			matchOptimizer.SetTeamScorer(server.teamHealth)
+		}
 	}
+	server.matchOptimizer = matchOptimizer
 	server.manager = orchestrator.NewGameManager(config, gameSettings, matchmaking.NewWaitingRoom(config), matchOptimizer, server.newObserver)
+	// 型付き nil をインターフェースへ入れると非nilとして扱われるため、実体があるときだけ渡す。
+	obs := orchestrator.Observability{
+		TeamHealth:     server.teamHealth,
+		MilestoneEvery: config.SlackNotifier.MilestoneEvery,
+		StallThreshold: config.SlackNotifier.StallThreshold,
+	}
+	if server.slackNotifier != nil {
+		obs.Notifier = server.slackNotifier
+	}
+	server.manager.SetObservability(obs)
 	return server, nil
 }
 
@@ -85,6 +108,9 @@ func (s *Server) newObserver() observer.GameObserver {
 	if s.liveState != nil {
 		observers = append(observers, s.liveState)
 	}
+	if s.teamHealth != nil {
+		observers = append(observers, s.teamHealth)
+	}
 	return observer.NewComposite(observers...)
 }
 
@@ -97,11 +123,16 @@ func (s *Server) Run() {
 		sig := <-trap
 		slog.Info("シグナルを受信しました", "signal", sig)
 		s.manager.BeginShutdown()
+		s.slackNotifier.NotifyServerEvent(":octagonal_sign: *シャットダウンを開始しました* signal=" + sig.String())
 		s.manager.WaitAllFinished()
+		// 送信ワーカが最後の通知を投げ終えるのを待たずに落とすと通知が消える。
+		s.slackNotifier.Close()
 		os.Exit(0)
 	}()
 
+	s.manager.StartWatchdog()
 	slog.Info("サーバを起動しました", "host", s.config.Server.WebSocket.Host, "port", s.config.Server.WebSocket.Port)
+	s.slackNotifier.NotifyServerEvent(":rocket: *サーバを起動しました* " + s.config.Server.WebSocket.Host + ":" + strconv.Itoa(s.config.Server.WebSocket.Port))
 	err := router.Run(s.config.Server.WebSocket.Host + ":" + strconv.Itoa(s.config.Server.WebSocket.Port))
 	if err != nil {
 		slog.Error("サーバの起動に失敗しました", "error", err)

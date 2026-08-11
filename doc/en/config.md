@@ -208,3 +208,60 @@ During the game server's operation, the VOICEVOX server must always be running.
 - `duration_args`: Arguments to retrieve the length of the generated audio.
 - `pre_convert_args`: Arguments for pre-conversion if the generated audio exceeds the segment length.
 - `split_args`: Arguments for splitting pre-converted audio into segments.
+
+## team_health (Team Health Settings)
+
+> [!NOTE]
+> This feature aggregates each team's failure rate from recent games and reflects it in the matchmaking weight and quarantine decisions.\
+> The aggregated results can be checked at [GET /api/v1/teams](/doc/en/api.md#get-apiv1teams).\
+> If `matching.is_optimize` is `false`, aggregation and exposure via the API still happen, but the weight-based ordering and quarantine do not.
+
+The failure rate is a weighted average of the following three metrics over the last `window` games, ranging from 0 to 1.
+
+- Response error rate: the proportion of requests that timed out or returned an error.
+- Dropout rate: the proportion of games in which an agent stopped accepting any further requests.
+- Abort rate: the proportion of games cut short for exceeding `server.max_continue_error_ratio`.
+
+A match's priority is its effective weight: the `weight` in `scheduled_matches` multiplied by the weight (`1 - failure rate`) of each participating team.\
+Because match-level and team-level failures are expressed on the same weight, the priority drops through the same mechanism in either case.
+
+- `enable`: Whether to enable team health aggregation.
+- `window`: The number of recent games used to evaluate the failure rate.
+- `min_games`: The minimum number of games required before evaluation begins.
+  Teams below this are neither penalized nor quarantined. This is a grace period so a single mishap does not exclude a team.
+- `scores`: The weight of each metric when computing the failure rate. Only the ratios matter.
+  - `request_error`: The contribution of the response error rate.
+  - `fatal`: The contribution of the dropout rate.
+  - `abort`: The contribution of the abort rate.
+- `weight_floor`: The lower bound of a team's weight.
+  Setting it to 0 amounts to permanent exclusion, so a value greater than 0 is normally specified.
+- `quarantine_rate`: The failure rate threshold at which quarantine begins.
+- `quarantine_duration`: How long until the quarantine is lifted.
+  Matches containing a quarantined team are removed from the matchmaking candidates and the team returns automatically once the period expires.\
+  However, if no candidate would remain, the quarantine is ignored to avoid making games impossible to form.
+- `abort_weight_factor`: The factor multiplied into the `weight` of an aborted match itself.
+  With `0.0`, an aborted match drops to the bottom in one step. With a value greater than 0 such as `0.5`, it decays gradually with each failure.
+
+## slack_notifier (Slack Notification Settings)
+
+> [!NOTE]
+> Sends events that an operator needs to notice to a Slack Incoming Webhook.\
+> Sending is done by a dedicated goroutine, so delays or outages on the Slack side never stall the game.
+
+- `enable`: Whether to enable Slack notifications.
+- `webhook_url`: The Incoming Webhook URL.
+  If empty, the `SLACK_WEBHOOK_URL` environment variable is used. Since the URL is a secret, using the environment variable rather than writing it directly in the config file is recommended.
+- `username`: The display name used for notifications.
+- `icon_emoji`: The icon used for notifications.
+- `timeout`: The timeout for sending to the webhook.
+- `min_interval`: The minimum interval between sends.
+  Messages are spaced by this interval so as not to hit the webhook's rate limit.
+- `events`: The list of kinds to notify. If empty, all of them are notified.
+  - `quarantine`: When a team is quarantined.
+  - `abort`: When a game is cut short due to repeated errors.
+  - `stall`: When no match has been formed for a certain period.
+  - `milestone`: Server startup and shutdown, plus progress every so many games.
+- `stall_threshold`: Notify when no match has been formed for this long.
+  Only evaluated when there are no games in progress. If 0, stall monitoring is disabled.
+- `milestone_every`: How many games between progress notifications.
+  If 0, progress notifications are disabled.

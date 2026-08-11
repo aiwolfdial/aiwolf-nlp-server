@@ -14,6 +14,8 @@
 | `GET /api/v1/healthz` | 不要 | 死活監視 |
 | `GET /api/v1/readyz` | 不要 | 接続の受付可否 |
 | `GET /api/v1/ruleset` | 不要 | このサーバが実行中のルール |
+| `GET /api/v1/teams` | 必要 | チームごとの失敗率と隔離状況 |
+| `GET /api/v1/teams/{name}` | 必要 | 指定したチームの失敗率と隔離状況 |
 | `GET /api/v1/games` | 必要 | 進行中のゲーム一覧 |
 | `GET /api/v1/games/{id}` | 必要 | 指定したゲームの現在状態 |
 | `GET /api/v1/games/{id}/events` | 必要 | 指定したゲームのイベント配信 (SSE) |
@@ -67,6 +69,57 @@ curl -H "Authorization: Bearer <TOKEN>" http://127.0.0.1:8080/api/v1/games
 - `is_optimize` (bool): 最適化した組み合わせマッチングが有効か.
 - `self_match` (bool): 自己対戦モードが有効か.
 - `roles` (dict[str, int]): 役職ごとの人数.
+
+### GET /api/v1/teams
+
+チームごとの失敗率と隔離状況を返します。マッチングの重みがなぜ下がったかを外から確認するために使用します。\
+`team_health.enable` が `false` の場合は `404 Not Found` を返します。
+
+集計は直近 `team_health.window` 試合が対象で、それより古い記録は評価から外れます。\
+各項目の意味は [team_health の設定](/doc/ja/config.md#team_health-チーム健全性の設定) を参照してください。
+
+```json
+{
+  "teams": [
+    {
+      "team": "kanolab",
+      "games": 12,
+      "requests": 480,
+      "request_errors": 3,
+      "fatal_games": 1,
+      "aborted_games": 1,
+      "failure_rate": 0.08,
+      "weight": 0.92,
+      "quarantined": false,
+      "quarantine_count": 0,
+      "active_games": 1,
+      "last_seen": 1750000000
+    }
+  ],
+  "progress": { "done": 40, "total": 100 }
+}
+```
+
+- `teams` (list[Team]): チームごとの状態. チーム名の昇順.
+  - `team` (str): チーム名.
+  - `games` (int): 評価対象となっている試合数.
+  - `requests` (int): 評価対象の試合で送信したリクエスト数.
+  - `request_errors` (int): そのうちタイムアウトやエラーで終わった数.
+  - `fatal_games` (int): エージェントが脱落した試合数.
+  - `aborted_games` (int): エラー多発で打ち切られた試合数.
+  - `failure_rate` (float): 失敗率. 0から1.
+  - `weight` (float): マッチの重みに掛かる係数. 実績が `min_games` に満たない場合は 1.0.
+  - `quarantined` (bool): 隔離中か.
+  - `quarantined_until` (int | None): 隔離が解除される時刻 (Unix 秒). 隔離中のみ.
+  - `quarantine_count` (int): 隔離された回数の累計.
+  - `active_games` (int): 現在進行中の試合数.
+  - `last_seen` (int | None): 最後にゲームへ参加した時刻 (Unix 秒).
+- `progress` (dict | None): 消化済みと予定の試合数. `matching.is_optimize` が `true` の場合のみ.
+
+### GET /api/v1/teams/{name}
+
+指定したチームの状態を返します。構造は `teams` の各要素と同じです。\
+一度もゲームへ参加していないチームの場合は `404 Not Found` を返します。
 
 ### GET /api/v1/games
 

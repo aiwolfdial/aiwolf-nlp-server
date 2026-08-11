@@ -18,6 +18,8 @@ type Config struct {
 	GameLogger          GameLoggerConfig          `yaml:"game_logger"`
 	RealtimeBroadcaster RealtimeBroadcasterConfig `yaml:"realtime_broadcaster"`
 	TTSBroadcaster      TTSBroadcasterConfig      `yaml:"tts_broadcaster"`
+	TeamHealth          TeamHealthConfig          `yaml:"team_health"`
+	SlackNotifier       SlackNotifierConfig       `yaml:"slack_notifier"`
 }
 
 type ServerConfig struct {
@@ -148,6 +150,36 @@ type TTSBroadcasterConfig struct {
 	DurationArgs   []string      `yaml:"duration_args"`
 	PreConvertArgs []string      `yaml:"pre_convert_args"`
 	SplitArgs      []string      `yaml:"split_args"`
+}
+
+// チームごとの失敗率を直近 Window 試合で評価し、マッチの重みと隔離に反映するための設定。
+type TeamHealthConfig struct {
+	Enable   bool `yaml:"enable"`
+	Window   int  `yaml:"window"`
+	MinGames int  `yaml:"min_games"`
+	// 失敗率は3つの指標の加重平均で、重みの比だけが意味を持つ。
+	Scores struct {
+		RequestError float64 `yaml:"request_error"`
+		Fatal        float64 `yaml:"fatal"`
+		Abort        float64 `yaml:"abort"`
+	} `yaml:"scores"`
+	WeightFloor        float64       `yaml:"weight_floor"`
+	QuarantineRate     float64       `yaml:"quarantine_rate"`
+	QuarantineDuration time.Duration `yaml:"quarantine_duration"`
+	AbortWeightFactor  float64       `yaml:"abort_weight_factor"`
+}
+
+type SlackNotifierConfig struct {
+	Enable bool `yaml:"enable"`
+	// 空のときは環境変数 SLACK_WEBHOOK_URL を使う。URLは秘匿情報なので設定ファイルへ直接書かない運用を想定する。
+	WebhookURL     string        `yaml:"webhook_url"`
+	Username       string        `yaml:"username"`
+	IconEmoji      string        `yaml:"icon_emoji"`
+	Timeout        time.Duration `yaml:"timeout"`
+	MinInterval    time.Duration `yaml:"min_interval"`
+	Events         []string      `yaml:"events"`
+	StallThreshold time.Duration `yaml:"stall_threshold"`
+	MilestoneEvery int           `yaml:"milestone_every"`
 }
 
 func LoadFromPath(path string) (*Config, error) {

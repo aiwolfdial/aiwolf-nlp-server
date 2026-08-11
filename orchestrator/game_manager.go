@@ -10,7 +10,25 @@ import (
 	"github.com/aiwolfdial/aiwolf-nlp-server/matchmaking"
 	"github.com/aiwolfdial/aiwolf-nlp-server/model"
 	"github.com/aiwolfdial/aiwolf-nlp-server/observer"
+	"github.com/aiwolfdial/aiwolf-nlp-server/observer/teamhealth"
 )
+
+// GameManager が使う通知先。service.SlackNotifier が実装する。
+// 上位パッケージへ依存しないよう、必要なメソッドだけをここで宣言する。
+type Notifier interface {
+	NotifyGameAborted(gameID string, teams []string, fatalTeams []string)
+	NotifyTeamQuarantined(snapshots []teamhealth.Snapshot)
+	NotifyMatchmakingStalled(idle time.Duration, waiting []string)
+	NotifyProgress(done int, total int)
+}
+
+// 監視まわりの差し込み。すべて任意で、未設定なら従来どおりの挙動になる。
+type Observability struct {
+	TeamHealth     *teamhealth.Tracker
+	Notifier       Notifier
+	MilestoneEvery int
+	StallThreshold time.Duration
+}
 
 // 待機部屋・マッチオプティマイザ・進行中ゲームの登録簿を持ち、マッチングとゲームの
 // 生成・破棄を担う。終了したゲームは登録簿から取り除かれるため、登録簿は実行中の
@@ -23,6 +41,12 @@ type GameManager struct {
 	observerFactory func() observer.GameObserver
 	games           sync.Map
 	shuttingDown    atomic.Bool
+
+	obs           Observability
+	lastMatchUnix atomic.Int64
+	stallNotified atomic.Bool
+	milestoneMu   sync.Mutex
+	lastMilestone int
 }
 
 type gameEntry struct {
@@ -42,13 +66,20 @@ func (e *gameEntry) snapshot() model.GameSnapshot {
 }
 
 func NewGameManager(config model.Config, gameSetting *model.Setting, waitingRoom *matchmaking.WaitingRoom, matchOptimizer *matchmaking.MatchOptimizer, observerFactory func() observer.GameObserver) *GameManager {
-	return &GameManager{
+	m := &GameManager{
 		config:          config,
 		gameSetting:     gameSetting,
 		waitingRoom:     waitingRoom,
 		matchOptimizer:  matchOptimizer,
 		observerFactory: observerFactory,
 	}
+	// 停滞の起点は起動時刻。1件目が成立しないまま放置されている状態も検知したい。
+	m.lastMatchUnix.Store(time.Now().Unix())
+	return m
+}
+
+func (m *GameManager) SetObservability(o Observability) {
+	m.obs = o
 }
 
 // 接続を待機部屋へ追加し、マッチが成立すればゲームを生成して開始する。
@@ -82,6 +113,9 @@ func (m *GameManager) TryStartGame(conn model.Connection) {
 		agents:    game.AgentViews(),
 		startedAt: time.Now(),
 	})
+	// マッチが成立したので停滞の起点を進め、次の停滞をまた通知できるようにする。
+	m.lastMatchUnix.Store(time.Now().Unix())
+	m.stallNotified.Store(false)
 
 	go func() {
 		winSide := game.Start()
@@ -89,12 +123,81 @@ func (m *GameManager) TryStartGame(conn model.Connection) {
 			if winSide != model.T_NONE {
 				m.matchOptimizer.SetMatchEnd(game.GetRoleTeamNamesMap())
 			} else {
-				m.matchOptimizer.SetMatchWeight(game.GetRoleTeamNamesMap(), 0)
+				m.matchOptimizer.PenalizeMatch(game.GetRoleTeamNamesMap())
 			}
 		}
+		m.recordOutcome(game.GetID(), game.AbortedByError())
 		// 終了したゲームを登録簿から取り除く。これがないとプロセス終了まで残り続ける。
 		m.games.Delete(game.GetID())
 	}()
+}
+
+// ゲームの確定結果をチームの成績へ積み、隔離や異常終了を通知する。
+// winSide が T_NONE でも max_day 到達なら異常終了ではないため、abortedByError で区別する。
+func (m *GameManager) recordOutcome(id string, abortedByError bool) {
+	var outcome teamhealth.GameOutcome
+	if m.obs.TeamHealth != nil {
+		outcome = m.obs.TeamHealth.FinishGame(id, abortedByError)
+	}
+	if m.obs.Notifier == nil {
+		return
+	}
+	if abortedByError {
+		m.obs.Notifier.NotifyGameAborted(id, outcome.Teams, outcome.FatalTeams)
+	}
+	if len(outcome.Quarantined) > 0 {
+		for _, s := range outcome.Quarantined {
+			slog.Warn("チームを隔離しました", "team", s.Team, "failure_rate", s.FailureRate, "games", s.Games)
+		}
+		m.obs.Notifier.NotifyTeamQuarantined(outcome.Quarantined)
+	}
+	m.notifyMilestone()
+}
+
+// 一定試合数ごとに進捗を通知する。同じ節目を二度通知しないよう到達点を覚えておく。
+func (m *GameManager) notifyMilestone() {
+	if m.matchOptimizer == nil || m.obs.MilestoneEvery <= 0 {
+		return
+	}
+	done, total := m.matchOptimizer.Progress()
+	m.milestoneMu.Lock()
+	if done <= m.lastMilestone || done%m.obs.MilestoneEvery != 0 {
+		m.milestoneMu.Unlock()
+		return
+	}
+	m.lastMilestone = done
+	m.milestoneMu.Unlock()
+	m.obs.Notifier.NotifyProgress(done, total)
+}
+
+// StartWatchdog はマッチが成立しない状態が続いていないかを定期的に確認する。
+// 待機部屋にチームがいるのに1件も組めない状態は、放置すると誰も気づけないため通知する。
+func (m *GameManager) StartWatchdog() {
+	threshold := m.obs.StallThreshold
+	if threshold <= 0 || m.obs.Notifier == nil {
+		return
+	}
+	interval := max(threshold/2, 30*time.Second)
+	go func() {
+		for range time.Tick(interval) {
+			m.checkStall(threshold)
+		}
+	}()
+}
+
+func (m *GameManager) checkStall(threshold time.Duration) {
+	// シャットダウン中や対戦中は「組めていない」ではないので対象外。
+	if m.IsShuttingDown() || m.ActiveCount() > 0 || m.stallNotified.Load() {
+		return
+	}
+	idle := time.Since(time.Unix(m.lastMatchUnix.Load(), 0))
+	if idle < threshold {
+		return
+	}
+	waiting := m.waitingRoom.Teams()
+	slog.Warn("マッチが成立していません", "idle", idle.String(), "waiting", len(waiting))
+	m.stallNotified.Store(true)
+	m.obs.Notifier.NotifyMatchmakingStalled(idle, waiting)
 }
 
 func (m *GameManager) ActiveCount() int {

@@ -28,6 +28,36 @@ func (s *Server) registerAPI(router *gin.Engine) {
 		c.JSON(http.StatusOK, s.config.RulesetInfo())
 	})
 
+	// チームごとの失敗率と隔離状況。マッチングの重みがなぜ下がったかを外から確認するために公開する。
+	teams := api.Group("/teams")
+	if s.config.Server.Authentication.Enable {
+		teams.Use(receiverAuthMiddleware())
+	}
+	teams.GET("", func(c *gin.Context) {
+		if s.teamHealth == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "team health unavailable"})
+			return
+		}
+		body := gin.H{"teams": s.teamHealth.Snapshots()}
+		if s.matchOptimizer != nil {
+			done, total := s.matchOptimizer.Progress()
+			body["progress"] = gin.H{"done": done, "total": total}
+		}
+		c.JSON(http.StatusOK, body)
+	})
+	teams.GET("/:name", func(c *gin.Context) {
+		if s.teamHealth == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "team health unavailable"})
+			return
+		}
+		snap, ok := s.teamHealth.Get(c.Param("name"))
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": "team not found"})
+			return
+		}
+		c.JSON(http.StatusOK, snap)
+	})
+
 	games := api.Group("/games")
 	if s.config.Server.Authentication.Enable {
 		games.Use(receiverAuthMiddleware())
