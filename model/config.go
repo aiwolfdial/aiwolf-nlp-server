@@ -18,6 +18,8 @@ type Config struct {
 	GameLogger          GameLoggerConfig          `yaml:"game_logger"`
 	RealtimeBroadcaster RealtimeBroadcasterConfig `yaml:"realtime_broadcaster"`
 	TTSBroadcaster      TTSBroadcasterConfig      `yaml:"tts_broadcaster"`
+	TeamHealth          TeamHealthConfig          `yaml:"team_health"`
+	SlackNotifier       SlackNotifierConfig       `yaml:"slack_notifier"`
 }
 
 type ServerConfig struct {
@@ -90,6 +92,9 @@ type MatchingConfig struct {
 	GameCount    int    `yaml:"game_count"`
 	OutputPath   string `yaml:"output_path"`
 	InfiniteLoop bool   `yaml:"infinite_loop"`
+	// 異常終了したマッチ自身の重みに掛ける係数。対戦表の組み立て方の設定なので、
+	// チームの健全性 (team_health) とは独立して効く。
+	AbortWeightFactor float64 `yaml:"abort_weight_factor"`
 }
 
 type CustomProfileConfig struct {
@@ -148,6 +153,35 @@ type TTSBroadcasterConfig struct {
 	DurationArgs   []string      `yaml:"duration_args"`
 	PreConvertArgs []string      `yaml:"pre_convert_args"`
 	SplitArgs      []string      `yaml:"split_args"`
+}
+
+// チームごとの失敗率を直近 Window 試合で評価し、チーム単位の重みと隔離を決める設定。
+// マッチ自身の重みをどう扱うかは matching の責務なのでここには置かない。
+type TeamHealthConfig struct {
+	Enable   bool `yaml:"enable"`
+	Window   int  `yaml:"window"`
+	MinGames int  `yaml:"min_games"`
+	// 失敗率は3つの指標の加重平均で、重みの比だけが意味を持つ。
+	Scores struct {
+		RequestError float64 `yaml:"request_error"`
+		Fatal        float64 `yaml:"fatal"`
+		Abort        float64 `yaml:"abort"`
+	} `yaml:"scores"`
+	WeightFloor        float64       `yaml:"weight_floor"`
+	QuarantineRate     float64       `yaml:"quarantine_rate"`
+	QuarantineDuration time.Duration `yaml:"quarantine_duration"`
+}
+
+// Webhook URL は秘匿情報なので設定ファイルには置かず、環境変数 SLACK_WEBHOOK_URL からのみ読む。
+type SlackNotifierConfig struct {
+	Enable         bool          `yaml:"enable"`
+	Username       string        `yaml:"username"`
+	IconEmoji      string        `yaml:"icon_emoji"`
+	Timeout        time.Duration `yaml:"timeout"`
+	MinInterval    time.Duration `yaml:"min_interval"`
+	Events         []string      `yaml:"events"`
+	StallThreshold time.Duration `yaml:"stall_threshold"`
+	MilestoneEvery int           `yaml:"milestone_every"`
 }
 
 func LoadFromPath(path string) (*Config, error) {

@@ -103,3 +103,10 @@ realtime_broadcaster:
 
 tts_broadcaster:
   enable: false
+
+team_health:
+  enable: true
+  window: 5
+  min_games: 2
+  quarantine_rate: 0.5
+  quarantine_duration: 1m

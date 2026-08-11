@@ -36,8 +36,8 @@ CI (`.github/workflows/test.yml`) は Go 1.25.x で `go build -race` と `go tes
 | `matchmaking/` | 待機部屋、マッチオプティマイザ、マッチ履歴の解析 |
 | `logic/` | ゲームロジック。日付進行、各フェーズ、発言の集約と制限 |
 | `model/` | 設定・パケット・エージェント等のデータ構造。他パッケージに依存しない |
-| `observer/` | ゲームイベントの通知インターフェースと配信の共通実装 |
-| `service/` | observer の実装。JSON ログ、ゲームログ、リアルタイム配信、TTS |
+| `observer/` | ゲームイベントの通知インターフェースと配信の共通実装。`livestate` は現在状態、`teamhealth` はチーム別の失敗率 |
+| `service/` | observer の実装。JSON ログ、ゲームログ、リアルタイム配信、TTS、Slack 通知 |
 | `store/` | マッチオプティマイザの永続化 |
 | `util/` | 認証、文字数カウント、プロフィール生成などの補助関数 |
 | `config/` | 配布用の設定ファイル (`default_*.yml` / `freeform_*.yml`) |
@@ -55,6 +55,8 @@ CI (`.github/workflows/test.yml`) は Go 1.25.x で `go build -race` と `go tes
 - **整形は sink 側で行います。** CSV 書式やブロードキャストパケットの組み立ては `service` / `observer` 側の責務で、`logic` はセマンティックなイベントを通知するだけです。
 - **observer へ渡す値は読み取り専用のビュー型**（`model.AgentView` / `model.TalkView` / `model.GameSnapshot`）にします。`model.Agent` は `Connection` を含むため外部へ渡しません。
 - **ゲームは設定を `RulesetView` / `SettingView` 経由で読みます。** getter のみのインターフェースなので、ゲーム開始後に設定が変わることはありません。
+- **マッチの優先度は実効重み1つに集約します。** マッチ単位の失敗 (`MatchWeight.Weight`) もチーム単位の失敗 (`matchmaking.TeamScorer`) も掛け合わせて `GetMatches` が並べ替えます。除外の仕組みを別に足さないでください。
+- **`orchestrator` は `service` を import しません。** 通知先は `orchestrator.Notifier` として宣言し、`transport` が実体を差し込みます。
 - 通信方式は設定の `talk.duration` / `whisper.duration` の有無で分岐します。ターンベース方式は `logic/communication_turn.go`、グループチャット方式は `logic/communication_freeform.go` にあり、発言の検証と文字数制限は `logic/communication_session.go` に共通化されています。
 
 ## コーディング規約

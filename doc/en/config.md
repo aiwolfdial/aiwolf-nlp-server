@@ -8,6 +8,8 @@ When running a released binary, `./.env` is loaded; when running directly from t
 
 - `SECRET_KEY`: The secret key used for token verification when `server.authentication.enable` is set to `true` in the configuration file.
 - `OPENAI_API_KEY`: The API key for ChatGPT used when `custom_profile.dynamic_profile.enable` is set to `true` in the configuration file.
+- `SLACK_WEBHOOK_URL`: The Incoming Webhook URL to notify when `slack_notifier.enable` is set to `true` in the configuration file.
+  Since it is a secret, it cannot be placed in the configuration file and is specified only here.
 
 ### Overriding the Configuration
 
@@ -39,6 +41,8 @@ When they are not set, the values from the configuration file are used.
 - `acceptable`: Grace period on the server side.
 
 - `max_continue_error_ratio`: The maximum ratio of error agents that can continue in the game.
+  The number of agents at which a game is cut short is `int(agent_count x this value)`, but a value that truncates to 0 is rounded up to 1.\
+  With 0, a game would be cut short even though no agent has dropped out (this applies below 0.2 for a 5-player game and below 0.077 for a 13-player game).
 
 ## game (Game Settings)
 
@@ -120,6 +124,9 @@ The total number of roles should match the sum of all the keys.
 - `output_path`: The output file path for the match history. (Only applies when `is_optimize` is `true`).
 - `infinite_loop`: Whether to add more games after all combinations of matching have been completed. (Only applies when `is_optimize` is `true`).
   Generally, it should be set to `false`.
+- `abort_weight_factor`: The factor multiplied into the weight of a match cut short by repeated errors. (Only applies when `is_optimize` is `true`).
+  With `0.0`, an aborted match drops to the bottom in one step. With a value greater than 0 such as `0.5`, it decays gradually with each failure.\
+  This governs the match-level weight, so it applies independently of whether `team_health` is enabled.
 
 ## custom_profile (Custom Profile Settings)
 
@@ -208,3 +215,78 @@ During the game server's operation, the VOICEVOX server must always be running.
 - `duration_args`: Arguments to retrieve the length of the generated audio.
 - `pre_convert_args`: Arguments for pre-conversion if the generated audio exceeds the segment length.
 - `split_args`: Arguments for splitting pre-converted audio into segments.
+
+## team_health (Team Health Settings)
+
+> [!NOTE]
+> This feature aggregates each team's failure rate from recent games and reflects it in the matchmaking weight and quarantine decisions.\
+> The aggregated results can be checked at [GET /api/v1/teams](/doc/en/api.md#get-apiv1teams).\
+> If `matching.is_optimize` is `false`, aggregation and exposure via the API still happen, but the weight-based ordering and quarantine do not.
+
+The failure rate is a weighted average of the following three metrics over the last `window` games, ranging from 0 to 1.
+
+- Response error rate: the proportion of requests that timed out or returned an error.
+- Dropout rate: the proportion of games in which an agent stopped accepting any further requests.
+- Abort rate: the proportion of games cut short for exceeding `server.max_continue_error_ratio`.
+
+A match's priority is its effective weight: the `weight` in `scheduled_matches` multiplied by the weight (`1 - failure rate`) of each participating team.\
+Because match-level and team-level failures are expressed on the same weight, the priority drops through the same mechanism in either case.
+
+- `enable`: Whether to enable team health aggregation.
+- `window`: The number of recent games used to evaluate the failure rate.
+- `min_games`: The minimum number of games required before evaluation begins.
+  Teams below this are neither penalized nor quarantined. This is a grace period so a single mishap does not exclude a team.
+- `scores`: The weight of each metric when computing the failure rate. Only the ratios matter.
+  - `request_error`: The contribution of the response error rate.
+  - `fatal`: The contribution of the dropout rate.
+  - `abort`: The contribution of the abort rate.
+- `weight_floor`: The lower bound of a team's weight.
+  Setting it to 0 amounts to permanent exclusion, so a value greater than 0 is normally specified.
+- `quarantine_rate`: The failure rate threshold at which quarantine begins.
+- `quarantine_duration`: How long after quarantining until it is lifted automatically.
+  Further failures while quarantined do not extend the deadline. Extending it would let failures beget failures with no way back, so the team is always released once and re-evaluated on its recent record.\
+  If failures remain within the window after release, the result of the next game quarantines it again.\
+  Matches containing a quarantined team are removed from the matchmaking candidates.\
+  However, if no candidate would remain, the quarantine is ignored to avoid making games impossible to form.
+
+> [!IMPORTANT]
+> Team-level evaluation affects the match order only when `matching.team_count` is greater than `game.agent_count`.\
+> When the two are equal, every generated match uses all teams in one seat each, so two things happen at once.\
+> - Quarantining any team wipes out the candidates, so the quarantine is always ignored.\
+> - The product of the team weights is the same value for every match, so the order is decided by each match's own `weight` alone.\
+> In this configuration, only the match-level drop in priority from `matching.abort_weight_factor` and the visibility through the API and Slack still work.
+
+## slack_notifier (Slack Notification Settings)
+
+> [!NOTE]
+> Sends events that an operator needs to notice to a Slack Incoming Webhook.\
+> Sending is done by a dedicated goroutine, so delays or outages on the Slack side never stall the game.\
+> Since the webhook URL is a secret, it is never placed in the config file and is read only from the `SLACK_WEBHOOK_URL` environment variable. If it is unset, a warning is logged and notifications are disabled.
+
+Notifications are built with Block Kit and distinguish severity by a color bar (green = progress, yellow = quarantine and stall, red = abort, blue = startup and shutdown).\
+Progress and failure rates are shown as bars. The bars are wrapped in inline code so the columns stay aligned.
+
+```
+:chart_with_upwards_trend: Progress  15 / 28 games
+███████████░░░░░░░░░  53.6%
+13 left  -  1 in progress
+```
+
+- `enable`: Whether to enable Slack notifications.
+- `username`: The display name used for notifications.
+- `icon_emoji`: The icon used for notifications.
+- `timeout`: The timeout for sending to the webhook.
+- `min_interval`: The minimum interval between sends.
+  Messages are spaced by this interval so as not to hit the webhook's rate limit.
+- `events`: The list of kinds to notify. If empty, all of them are notified.
+  - `quarantine`: When a team is quarantined.
+  - `abort`: When a game is cut short due to repeated errors.
+  - `stall`: When no match has been formed for a certain period.
+  - `milestone`: Server startup and shutdown, plus progress every so many games.
+- `stall_threshold`: Notify when no new match has been formed for this long.
+  Only evaluated when teams are present in the waiting room. If 0, stall monitoring is disabled.\
+  It notifies even while games are in progress, as long as some team is being kept waiting. During a contest something is almost always running, so excluding in-progress games would mean it almost never fires.\
+  The notification separates the teams present in the waiting room ("connected") from those listed in the schedule but not connected ("awaiting").\
+  The latter is where the reason a match cannot form lies, but since the roster comes from the schedule, only the connected teams can be shown when `matching.is_optimize` is `false`.
+- `milestone_every`: How many games between progress notifications.
+  If 0, progress notifications are disabled.

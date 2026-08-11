@@ -23,6 +23,9 @@ flowchart LR
     O --> S3["service<br/>リアルタイム配信"]
     O --> S4["service<br/>TTS配信"]
     O --> S5["observer/livestate<br/>REST API・SSE"]
+    O --> S6["observer/teamhealth<br/>チーム別失敗率"]
+    S6 -->|"重み・隔離"| W
+    S6 -->|"通知"| S7["service<br/>Slack通知"]
 ```
 
 ## パッケージ構成
@@ -35,7 +38,7 @@ flowchart LR
 | `logic` | ゲームロジック。日付進行、各フェーズ、発言の集約と制限 |
 | `model` | 設定・パケット・エージェント等のデータ構造 |
 | `observer` | ゲームイベントの通知インターフェースと配信の共通実装 |
-| `service` | observer の実装。JSON ログ、ゲームログ、リアルタイム配信、TTS 配信 |
+| `service` | observer の実装。JSON ログ、ゲームログ、リアルタイム配信、TTS 配信、Slack 通知 |
 | `store` | マッチオプティマイザの状態の永続化 |
 | `util` | 認証、文字数カウント、プロフィール生成などの補助関数 |
 
@@ -88,9 +91,58 @@ CSV 書式やブロードキャストパケットの組み立てといった整�
 | `service.RealtimeBroadcaster` | リアルタイム配信用の JSONL ファイル | `realtime_broadcaster` |
 | `service.TTSBroadcaster` | VOICEVOX による音声セグメント | `tts_broadcaster` |
 | `observer/livestate.LiveState` | REST API と SSE のための現在状態 | 常に有効 |
+| `observer/teamhealth.Tracker` | チームごとの失敗率と隔離状況 | `team_health` |
 
 出力を追加する場合は `observer.GameObserver` を実装し、`newObserver` に登録します。\
 `observer.NoopObserver` を埋め込めば、必要なイベントだけを実装できます。
+
+## 監視とチームの健全性
+
+`observer/teamhealth.Tracker` は sink の1つとして、チームごとの失敗率を直近の試合から集計します。\
+集計の入力は次の3つで、いずれも `logic` から observer 経由で届きます。
+
+- `OnResponse` のエラー: リクエストのタイムアウトや不正な応答
+- `OnAgentFatal`: エージェントが以降のリクエストを一切受け付けられなくなった脱落
+- `GameManager` から報告されるゲームの確定結果: エラー多発による打ち切りかどうか
+
+`OnResponse` のエラーには再送で回復するタイムアウトも含まれるため、回復しない脱落だけを `OnAgentFatal` として別に通知しています。\
+また `winSide` は `max_day` 到達による引き分けでも `T_NONE` になるため、終わり方は `logic.Game.FinishReason` (`WIN` / `MAX_DAY` / `ERROR`) で区別します。
+
+集計結果は2つの経路で使われます。
+
+1. `matchmaking.TeamScorer` としてマッチオプティマイザへ渡され、マッチの優先度に反映されます。
+2. `orchestrator.Notifier` を通じて Slack へ通知されます。
+
+### マッチの優先度
+
+マッチの実効重みは、保存された `MatchWeight.Weight` に参加する各チームの信頼度を掛けた値です。
+
+```
+実効重み = マッチのweight × Π(各チームの 1 - 失敗率)
+```
+
+`GetMatches` はこの実効重みの降順でマッチを返し、隔離中のチームを含むマッチを候補から外します。\
+マッチ単位の失敗もチーム単位の失敗も同じ重みの上で表現されるため、優先度の下がり方は同じ仕組みに揃っています。\
+隔離によって候補が1件も残らない場合に限り、ゲームが成立しなくなるのを避けるため隔離は無視されます。
+
+### 通知
+
+`service.SlackNotifier` は `orchestrator.Notifier` を実装し、隔離・異常終了・マッチング停滞・進捗を Slack へ送ります。\
+送信は専用の goroutine が行い、キューが溢れた場合は通知を捨てます。ゲームの進行を Slack の遅延で止めないためです。
+
+`orchestrator` は `service` を直接 import せず、必要なメソッドだけを `Notifier` インターフェースとして宣言し、`transport` が実体を差し込みます。
+
+### 差し込み可能な依存
+
+`GameManager` が外から受け取る依存は、いずれも `orchestrator` 側で必要なメソッドだけを宣言しています。
+
+| インターフェース | 実体 | 目的 |
+| --- | --- | --- |
+| `orchestrator.Notifier` | `service.SlackNotifier` | 上位パッケージへの依存を作らずに通知する |
+| `orchestrator.WaitingRoom` | `matchmaking.WaitingRoom` | 待機部屋を差し替えてマッチングの判断をテストする |
+
+`WaitingRoom` の実体は接続の追加時に WebSocket の `RemoteAddr` を参照するため、実際の接続なしでは停滞検知や接続待ちチームの判定を検証できません。`orchestrator/game_manager_test.go` はこのインターフェースにチーム名だけを返す実装を差し込んでいます。
+
 
 ## 不変性のための型
 
@@ -108,6 +160,7 @@ observer や REST API へ渡す値は、内部状態へ到達できない読み�
 | --- | --- |
 | `SECRET_KEY` | `server.authentication.enable` が `true` の場合のトークン検証の秘密鍵 |
 | `OPENAI_API_KEY` | `custom_profile.dynamic_profile.enable` が `true` の場合の ChatGPT の API キー |
+| `SLACK_WEBHOOK_URL` | `slack_notifier.enable` が `true` の場合の Slack Incoming Webhook の URL |
 | `HOST` | `server.web_socket.host` の上書き |
 | `PORT` | `server.web_socket.port` の上書き |
 

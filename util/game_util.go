@@ -37,6 +37,16 @@ func CalcWinSideTeam(statusMap map[model.Agent]model.Status) model.Team {
 	return model.T_NONE
 }
 
+// エラー多発でゲームを打ち切る脱落人数の閾値。
+//
+// agent_count × ratio の切り捨てが 0 になる設定（5人村の 0.2 未満など）だと、
+// 「脱落0人 >= 0」が最初から成立して全ゲームが即座に打ち切られてしまう。
+// 閾値を無視して打ち切らない手もあるが、max_day が -1 のとき全員が応答不能でも
+// ゲームが終わらなくなるため、最も厳しい設定として最低1人に丸める。
+func CalcErrorAbortThreshold(agentCount int, ratio float64) int {
+	return max(1, int(float64(agentCount)*ratio))
+}
+
 func CalcHasErrorAgents(agents []*model.Agent) int {
 	var count int
 	for _, a := range agents {

@@ -90,6 +90,7 @@ matching:
   game_count: 5
   output_path: ./log/match_optimizer.json
   infinite_loop: false
+  abort_weight_factor: 0.0
 
 custom_profile:
   enable: true
@@ -340,3 +341,29 @@ tts_broadcaster:
     - "1"
     - -f
     - mpegts
+
+team_health:
+  enable: false
+  window: 20
+  min_games: 3
+  scores:
+    request_error: 1.0
+    fatal: 3.0
+    abort: 1.0
+  weight_floor: 0.1
+  quarantine_rate: 0.5
+  quarantine_duration: 30m
+
+slack_notifier:
+  enable: false
+  username: aiwolf-nlp-server
+  icon_emoji: ":wolf:"
+  timeout: 10s
+  min_interval: 1s
+  events:
+    - quarantine
+    - abort
+    - stall
+    - milestone
+  stall_threshold: 10m
+  milestone_every: 10

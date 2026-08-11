@@ -21,6 +21,9 @@ type GameObserver interface {
 	OnPhase(id string, request model.Request)
 	OnRequest(id string, agent model.AgentView, request json.RawMessage)
 	OnResponse(id string, agent model.AgentView, response string, err error)
+	// OnResponse のエラーには再送で回復するタイムアウトも含まれるため、以降のリクエストを
+	// 一切受け付けなくなった脱落だけを別イベントにして、監視側が区別できるようにする。
+	OnAgentFatal(id string, agent model.AgentView, err error)
 
 	OnVote(id string, day int, agent model.AgentView, target model.AgentView, state model.GameState)
 	OnAttackVote(id string, day int, agent model.AgentView, target model.AgentView, state model.GameState)

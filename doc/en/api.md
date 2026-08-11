@@ -14,6 +14,8 @@ All responses include `Access-Control-Allow-Origin: *`.
 | `GET /api/v1/healthz` | Not required | Liveness check |
 | `GET /api/v1/readyz` | Not required | Whether new connections are accepted |
 | `GET /api/v1/ruleset` | Not required | The ruleset this server is running |
+| `GET /api/v1/teams` | Required | Failure rate and quarantine status per team |
+| `GET /api/v1/teams/{name}` | Required | Failure rate and quarantine status of the given team |
 | `GET /api/v1/games` | Required | List of games in progress |
 | `GET /api/v1/games/{id}` | Required | Current state of the specified game |
 | `GET /api/v1/games/{id}/events` | Required | Event stream for the specified game (SSE) |
@@ -67,6 +69,57 @@ Returns the ruleset this process is running. Since the server runs with one conf
 - `is_optimize` (bool): Whether optimized combination matching is enabled.
 - `self_match` (bool): Whether self-play mode is enabled.
 - `roles` (dict[str, int]): The number of agents for each role.
+
+### GET /api/v1/teams
+
+Returns the failure rate and quarantine status of each team. Use it to check from the outside why a matchmaking weight went down.\
+If `team_health.enable` is `false`, `404 Not Found` is returned.
+
+Aggregation covers the last `team_health.window` games; older records fall out of the evaluation.\
+For the meaning of each field, see [the team_health settings](/doc/en/config.md#team_health-team-health-settings).
+
+```json
+{
+  "teams": [
+    {
+      "team": "kanolab",
+      "games": 12,
+      "requests": 480,
+      "request_errors": 3,
+      "fatal_games": 1,
+      "aborted_games": 1,
+      "failure_rate": 0.08,
+      "weight": 0.92,
+      "quarantined": false,
+      "quarantine_count": 0,
+      "active_games": 1,
+      "last_seen": 1750000000
+    }
+  ],
+  "progress": { "done": 40, "total": 100 }
+}
+```
+
+- `teams` (list[Team]): The state of each team, in ascending order of team name.
+  - `team` (str): The team name.
+  - `games` (int): The number of games under evaluation.
+  - `requests` (int): The number of requests sent during those games.
+  - `request_errors` (int): How many of those ended in a timeout or an error.
+  - `fatal_games` (int): The number of games in which an agent dropped out.
+  - `aborted_games` (int): The number of games cut short due to repeated errors.
+  - `failure_rate` (float): The failure rate, from 0 to 1.
+  - `weight` (float): The factor applied to the match weight. 1.0 if the team has fewer games than `min_games`.
+  - `quarantined` (bool): Whether the team is quarantined.
+  - `quarantined_until` (int | None): When the quarantine is lifted (Unix seconds). Only while quarantined.
+  - `quarantine_count` (int): The cumulative number of times the team has been quarantined.
+  - `active_games` (int): The number of games currently in progress.
+  - `last_seen` (int | None): When the team last joined a game (Unix seconds).
+- `progress` (dict | None): The number of played and planned games. Only when `matching.is_optimize` is `true`.
+
+### GET /api/v1/teams/{name}
+
+Returns the state of the specified team. The structure is the same as an element of `teams`.\
+If the team has never joined a game, `404 Not Found` is returned.
 
 ### GET /api/v1/games
 

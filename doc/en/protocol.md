@@ -33,7 +33,7 @@ In this document, messages sent from the server to the agents are referred to as
 - [Whisper Broadcast Request](#whisper-broadcast-request-whisper_broadcast) `WHISPER_BROADCAST` (Group Chat mode only)
 
 Depending on the type of request, the information contained in the request and whether a response is required differs.\
-For detailed implementation, refer to [request.go](../model/request.go) and [packet.go](../model/packet.go).
+For detailed implementation, refer to [request.go](/model/request.go) and [packet.go](/model/packet.go).
 
 ### Overview of Responses
 
