@@ -132,6 +132,17 @@ CSV 書式やブロードキャストパケットの組み立てといった整�
 
 `orchestrator` は `service` を直接 import せず、必要なメソッドだけを `Notifier` インターフェースとして宣言し、`transport` が実体を差し込みます。
 
+### 差し込み可能な依存
+
+`GameManager` が外から受け取る依存は、いずれも `orchestrator` 側で必要なメソッドだけを宣言しています。
+
+| インターフェース | 実体 | 目的 |
+| --- | --- | --- |
+| `orchestrator.Notifier` | `service.SlackNotifier` | 上位パッケージへの依存を作らずに通知する |
+| `orchestrator.WaitingRoom` | `matchmaking.WaitingRoom` | 待機部屋を差し替えてマッチングの判断をテストする |
+
+`WaitingRoom` の実体は接続の追加時に WebSocket の `RemoteAddr` を参照するため、実際の接続なしでは停滞検知や接続待ちチームの判定を検証できません。`orchestrator/game_manager_test.go` はこのインターフェースにチーム名だけを返す実装を差し込んでいます。
+
 
 ## 不変性のための型
 

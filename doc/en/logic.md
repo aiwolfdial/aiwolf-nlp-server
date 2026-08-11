@@ -23,7 +23,7 @@ The werewolf game has the following roles:
 The English name for the Villager faction is `VILLAGER`, and the English name for the Werewolf faction is `WEREWOLF`.\
 The English name for the Human species is `HUMAN`, and the English name for the Werewolf species is `WEREWOLF`.
 
-For more detailed implementation, please refer to [role.go](../model/role.go).
+For more detailed implementation, please refer to [role.go](/model/role.go).
 
 ### Number of Players
 

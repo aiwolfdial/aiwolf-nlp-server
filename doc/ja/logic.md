@@ -23,7 +23,7 @@
 市民陣営の英語名は `VILLAGER` 、人狼陣営の英語名は`WEREWOLF`です。\
 種族の人間の英語名は `HUMAN` 、人狼の英語名は `WEREWOLF` です。
 
-詳細な実装については、[role.go](../model/role.go)を参照してください。
+詳細な実装については、[role.go](/model/role.go)を参照してください。
 
 ### 人数
 

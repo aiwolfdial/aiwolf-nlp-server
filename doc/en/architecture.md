@@ -132,6 +132,17 @@ A dedicated goroutine performs the sending, and notifications are dropped when t
 
 `orchestrator` does not import `service` directly; it declares only the methods it needs as the `Notifier` interface, and `transport` injects the implementation.
 
+### Injectable Dependencies
+
+Every dependency `GameManager` receives from outside is declared on the `orchestrator` side as only the methods it needs.
+
+| Interface | Implementation | Purpose |
+| --- | --- | --- |
+| `orchestrator.Notifier` | `service.SlackNotifier` | Notify without creating a dependency on an upper package |
+| `orchestrator.WaitingRoom` | `matchmaking.WaitingRoom` | Swap the waiting room to test matchmaking decisions |
+
+The real `WaitingRoom` reads the WebSocket `RemoteAddr` when a connection is added, so stall detection and the awaiting-team split cannot be verified without real connections.`orchestrator/game_manager_test.go` injects an implementation that only returns team names.
+
 
 ## Types for Immutability
 

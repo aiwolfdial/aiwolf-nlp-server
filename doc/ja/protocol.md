@@ -33,7 +33,7 @@
 - [囁きブロードキャストリクエスト](#囁きブロードキャストリクエスト-whisper_broadcast) `WHISPER_BROADCAST` (グループチャット方式のみ)
 
 リクエストの種類によって、リクエストに含まれる情報が異なり、レスポンスを返す必要があるかどうかも異なります。\
-詳細な実装については、[request.go](../model/request.go)と[packet.go](../model/packet.go)を参照してください。
+詳細な実装については、[request.go](/model/request.go)と[packet.go](/model/packet.go)を参照してください。
 
 ### レスポンスの概要
 
