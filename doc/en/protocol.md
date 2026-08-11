@@ -265,3 +265,4 @@ The structure that contains the content of the conversation.
 - text (str): The content of the conversation.
 - skip (bool): Whether the conversation was skipped.
 - over (bool): Whether the conversation was over.
+- time (int): The time the conversation took place (Unix milliseconds).

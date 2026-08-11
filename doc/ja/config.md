@@ -4,8 +4,18 @@
 
 ## 環境変数ファイル (.env)
 
+リリースされたバイナリを実行する場合は `./.env` を、リポジトリから直接実行する場合は `./config/.env` を読み込みます。
+
 - `SECRET_KEY`: 設定ファイルの `server.authentication.enable` が `true` の場合にトークン検証時の秘密鍵
 - `OPENAI_API_KEY`: 設定ファイルの `custom_profile.dynamic_profile.enable` が `true` の場合に使用するChatGPTのAPIキー
+
+### 設定の上書き
+
+コンテナ実行など、設定ファイルを編集せずに待ち受けアドレスを変更したい場合は、以下の環境変数が利用できます。\
+未設定の場合は設定ファイルの値が使われます。
+
+- `HOST`: `server.web_socket.host` の上書き
+- `PORT`: `server.web_socket.port` の上書き
 
 ## server (サーバ設定)
 
@@ -116,14 +126,19 @@
 - `enable`: カスタムプロフィールを有効にするかどうか
   基本的には `true` で問題ありません。
 - `profile_encoding`: カスタムプロフィールもしくは動的プロフィールのうち、エンコードされる項目
+  キーが各プロフィールの項目名、値がエージェントに送信される際のラベルです。ここに記載されていない項目は送信されません。
 
 ### profiles (各エージェントのカスタムプロフィール)
 
 - `name`: エージェントの名前
 - `avatar_url`: エージェントのアバター画像のURL
+- `voice_id`: TTSブロードキャスターで使用するVOICEVOXの話者ID
 - `age`: エージェントの年齢 (オプション)
 - `gender`: エージェントの性別 (オプション)
 - `personality`: エージェントの性格 (オプション)
+
+`age` `gender` `personality` は `profile_encoding` のキーに対応する項目の例です。\
+`profile_encoding` に追加すれば、任意の項目を定義できます。
 
 ### dynamic_profile (動的プロフィールの設定)
 

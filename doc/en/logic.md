@@ -179,12 +179,13 @@ A random permutation of surviving werewolf agents (or surviving agents in the ta
 Starting from the front of the permutation, the following process is repeated for each agent:
 
 If the agent's `max_count.per_agent` remaining count is 0, skip.\
-If the agent's `remain_length` is 0 or less, skip. (If `remaining_length` is not set, skip)\
+If the agent's `remain_length` is 0 or less, skip. (Except when `remain_length` is not set.)\
 Send a `WHISPER` request to the agent.\
-Wait for a response to the `WHISPER` request.\
-If an error occurs, replace the speech with a skip (without increasing the skip count).\
-If the skip count exceeds `game.skip.max_count`, replace the speech with an over-speech.\
-If the speech is neither over nor skipped, reset the skip count.\
+Receive the response from the agent.\
+If an error occurs, replace the speech with a skip (without consuming the remaining skip count).\
+The remaining skip count is initialized with `max_skip` and is decremented by 1 for each skipped speech.\
+If a skip is specified while the remaining skip count is 0, replace the speech with an over-speech.\
+If the speech is neither over nor skipped, reset the remaining skip count to `max_skip`.\
 Perform the process for [speech length limits](#speech-length-limits).\
 If the speech is over, set the remaining count to 0.
 
