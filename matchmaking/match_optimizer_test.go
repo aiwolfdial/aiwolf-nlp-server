@@ -127,6 +127,40 @@ func TestWeightAffectsTheNextGetMatches(t *testing.T) {
 	}
 }
 
+// RoleIdxs が同一のマッチは Equal で区別できないため、どちらが消化されるかは格納順で
+// 決まる。重みを下げた方が残り、消化されるのは重みの高い方であること。
+// マッチオプティマイザは同じ組み合わせを複数スケジュールすることが実際にある。
+func TestDuplicateMatchKeepsThePenalizedEntry(t *testing.T) {
+	mo := newTestOptimizer()
+	mo.abortWeightFactor = 0.0
+	// alpha 対 beta を2件に増やし、同じ組み合わせが重複した状態にする。
+	mo.ScheduledMatches = append(mo.ScheduledMatches, model.MatchWeight{
+		RoleIdxs: map[model.Role][]int{model.R_WEREWOLF: {0}, model.R_VILLAGER: {1}},
+		Weight:   1.0,
+	})
+	match := map[model.Role][]string{model.R_WEREWOLF: {"alpha"}, model.R_VILLAGER: {"beta"}}
+
+	// 1件目のゲームが異常終了し、重みが下がる。
+	mo.PenalizeMatch(match)
+	// 次のマッチング時に格納順が重みの降順へ揃う。
+	mo.GetMatches()
+	// 2件目のゲームが正常終了する。
+	mo.SetMatchEnd(match)
+
+	var remaining []float64
+	for _, sm := range mo.ScheduledMatches {
+		if sm.Equal(model.MatchWeight{RoleIdxs: map[model.Role][]int{model.R_WEREWOLF: {0}, model.R_VILLAGER: {1}}}) {
+			remaining = append(remaining, sm.Weight)
+		}
+	}
+	if len(remaining) != 1 {
+		t.Fatalf("重複マッチが1件だけ消化されていません: %v", remaining)
+	}
+	if remaining[0] != 0.0 {
+		t.Fatalf("重みを下げた方が消化され、ペナルティが失われました: %v", remaining[0])
+	}
+}
+
 // infinite_loop で全マッチを消化したときに自己デッドロックしないこと。
 func TestGetMatchesAppendsWhenExhausted(t *testing.T) {
 	mo := newTestOptimizer()

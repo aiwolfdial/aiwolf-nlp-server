@@ -164,6 +164,13 @@ func (mo *MatchOptimizer) GetMatches() []map[model.Role][]string {
 		mo.appendLocked()
 	}
 
+	// 保存された重みの降順で格納スライス自体も並べ替える。RoleIdxs が同一のマッチは
+	// Equal で区別できず、SetMatchEnd も updateWeight も先頭の一致要素を選ぶため、
+	// この順序が「消化されるのは重みの高い方、下げられた方は残る」という対応を決める。
+	sort.SliceStable(mo.ScheduledMatches, func(i, j int) bool {
+		return mo.ScheduledMatches[i].Weight > mo.ScheduledMatches[j].Weight
+	})
+
 	type candidate struct {
 		teams  map[model.Role][]string
 		weight float64
@@ -173,8 +180,8 @@ func (mo *MatchOptimizer) GetMatches() []map[model.Role][]string {
 		teams := util.IdxMatchToTeamNameMatch(mo.IdxTeamMap, match.RoleIdxs)
 		candidates = append(candidates, candidate{teams: teams, weight: mo.effectiveWeight(match.Weight, teams)})
 	}
-	// 実効重みの降順で返す。元の実装は組み立てた後に並べ替えていたため、重みが次回の
-	// 呼び出しまで反映されなかった。
+	// 返却は実効重みの降順。元の実装は組み立てた後に並べ替えていたため、重みが次回の
+	// 呼び出しまで反映されなかった。チームの信頼度は変動するので格納順には持ち込まない。
 	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].weight > candidates[j].weight })
 
 	matches := []map[model.Role][]string{}
