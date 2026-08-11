@@ -239,6 +239,11 @@ Because match-level and team-level failures are expressed on the same weight, th
 - `quarantine_duration`: How long until the quarantine is lifted.
   Matches containing a quarantined team are removed from the matchmaking candidates and the team returns automatically once the period expires.\
   However, if no candidate would remain, the quarantine is ignored to avoid making games impossible to form.
+
+> [!IMPORTANT]
+> Quarantine only has an effect when `matching.team_count` is greater than `game.agent_count`.\
+> When the two are equal, every generated match uses all teams, so quarantining any team wipes out the candidates and the quarantine is always ignored.\
+> Even then, the weight-based drop in priority and the visibility through the API and Slack still work.
 - `abort_weight_factor`: The factor multiplied into the `weight` of an aborted match itself.
   With `0.0`, an aborted match drops to the bottom in one step. With a value greater than 0 such as `0.5`, it decays gradually with each failure.
 
