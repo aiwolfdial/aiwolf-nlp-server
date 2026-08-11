@@ -106,7 +106,7 @@ CSV 書式やブロードキャストパケットの組み立てといった整�
 - `GameManager` から報告されるゲームの確定結果: エラー多発による打ち切りかどうか
 
 `OnResponse` のエラーには再送で回復するタイムアウトも含まれるため、回復しない脱落だけを `OnAgentFatal` として別に通知しています。\
-また `winSide` は `max_day` 到達による引き分けでも `T_NONE` になるため、打ち切りかどうかは `logic.Game.AbortedByError` で区別します。
+また `winSide` は `max_day` 到達による引き分けでも `T_NONE` になるため、終わり方は `logic.Game.FinishReason` (`WIN` / `MAX_DAY` / `ERROR`) で区別します。
 
 集計結果は2つの経路で使われます。
 

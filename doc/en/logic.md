@@ -71,7 +71,8 @@ The game ends when one of the following conditions is met at the end of the [nig
 
 - The number of surviving agents of the Werewolf species is equal to or greater than the number of surviving agents of the Human species: Victory for the Werewolf Faction
 - The number of surviving agents of the Werewolf species is 0: Victory for the Villager Faction
-- The number of agents in an error state exceeds the maximum allowable error ratio for continuing the game
+- When the number of agents in an error state reaches the cut-off count
+  The cut-off count is `int(agent_count x server.max_continue_error_ratio)`, and a value that truncates to 0 is rounded up to 1.
 
 When the game ends, a `FINISH` request is sent to all agents.
 

@@ -106,7 +106,7 @@ It takes three inputs, all of which reach it from `logic` through the observer.
 - The confirmed game result reported by `GameManager`: whether the game was cut short by repeated errors.
 
 Because errors from `OnResponse` include timeouts that recover on retry, only the unrecoverable dropouts are reported separately as `OnAgentFatal`.\
-Likewise, `winSide` is also `T_NONE` for a draw at `max_day`, so whether a game was cut short is distinguished via `logic.Game.AbortedByError`.
+Likewise, `winSide` is also `T_NONE` for a draw at `max_day`, so how a game ended is distinguished via `logic.Game.FinishReason` (`WIN` / `MAX_DAY` / `ERROR`).
 
 The aggregated result is used along two paths.
 
