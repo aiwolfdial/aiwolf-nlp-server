@@ -75,6 +75,12 @@ func (c *Composite) OnResponse(id string, agent model.AgentView, response string
 	}
 }
 
+func (c *Composite) OnAgentFatal(id string, agent model.AgentView, err error) {
+	for _, o := range c.observers {
+		o.OnAgentFatal(id, agent, err)
+	}
+}
+
 func (c *Composite) OnVote(id string, day int, agent model.AgentView, target model.AgentView, state model.GameState) {
 	for _, o := range c.observers {
 		o.OnVote(id, day, agent, target, state)

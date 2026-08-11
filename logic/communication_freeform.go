@@ -149,7 +149,7 @@ func (s *CommunicationSession) listenForTalks(ctx context.Context, agent *model.
 		case msg := <-agent.ReadChannel():
 			if msg.Err != nil {
 				slog.Warn("エージェントの接続でエラーが発生したためリスンを終了します", "id", s.game.id, "agent", agent.String(), "error", msg.Err)
-				agent.HasError = true
+				s.game.failAgent(agent, msg.Err)
 				return
 			}
 

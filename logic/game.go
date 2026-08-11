@@ -14,6 +14,7 @@ type Game struct {
 	id                string
 	agents            []*model.Agent
 	winSide           model.Team
+	abortedByError    bool
 	isFinished        atomic.Bool
 	ruleset           model.RulesetView
 	setting           model.SettingView
@@ -132,6 +133,7 @@ func (g *Game) Start() model.Team {
 func (g *Game) shouldFinish() bool {
 	if util.CalcHasErrorAgents(g.agents) >= int(float64(len(g.agents))*g.ruleset.MaxContinueErrorRatio()) {
 		slog.Warn("エラーが多発したため、ゲームを終了します", "id", g.id)
+		g.abortedByError = true
 		return true
 	}
 	g.winSide = util.CalcWinSideTeam(g.getCurrentGameStatus().StatusMap)

@@ -123,9 +123,25 @@ func (g *Game) requestToAgent(agent *model.Agent, request model.Request) (string
 	}
 	reqBytes, _ := json.Marshal(packet)
 	g.obs.OnRequest(g.id, agent.View(), reqBytes)
+	hadError := agent.HasError
 	resp, err := agent.SendPacket(packet, g.ruleset.ActionTimeout(), g.ruleset.ResponseTimeout(), g.ruleset.AcceptableTimeout())
 	g.obs.OnResponse(g.id, agent.View(), resp, err)
+	// SendPacket は再送で回復しない失敗のときだけ HasError を立てる。立った瞬間を
+	// 脱落として通知し、回復するタイムアウトと監視側で区別できるようにする。
+	if !hadError && agent.HasError {
+		g.obs.OnAgentFatal(g.id, agent.View(), err)
+	}
 	return resp, err
+}
+
+// エージェントを脱落扱いにして observer へ通知する。既に脱落しているときは何もせず、
+// 同じエージェントの脱落を二重に数えないようにする。
+func (g *Game) failAgent(agent *model.Agent, err error) {
+	if agent.HasError {
+		return
+	}
+	agent.HasError = true
+	g.obs.OnAgentFatal(g.id, agent.View(), err)
 }
 
 func (g *Game) resetLastIdxMaps() {
@@ -208,4 +224,10 @@ func (g *Game) AgentViews() []model.AgentView {
 
 func (g *Game) IsFinished() bool {
 	return g.isFinished.Load()
+}
+
+// エラー多発で打ち切られたかどうか。max_day 到達でも winSide は T_NONE になるため、
+// 参加チームの責任を問える異常終了だけを区別するために使う。
+func (g *Game) AbortedByError() bool {
+	return g.abortedByError
 }
