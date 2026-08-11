@@ -11,6 +11,8 @@
 - [設定ファイルについて](/doc/ja/config.md)
 - [ゲームロジックの実装について](/doc/ja/logic.md)
 - [プロトコルの実装について](/doc/ja/protocol.md)
+- [REST API について](/doc/ja/api.md)
+- [アーキテクチャについて](/doc/ja/architecture.md)
 
 ## 実行方法
 

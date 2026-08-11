@@ -4,8 +4,18 @@
 
 ## Environment Variable File (.env)
 
+When running a released binary, `./.env` is loaded; when running directly from the repository, `./config/.env` is loaded.
+
 - `SECRET_KEY`: The secret key used for token verification when `server.authentication.enable` is set to `true` in the configuration file.
 - `OPENAI_API_KEY`: The API key for ChatGPT used when `custom_profile.dynamic_profile.enable` is set to `true` in the configuration file.
+
+### Overriding the Configuration
+
+If you want to change the listening address without editing the configuration file, such as when running in a container, the following environment variables are available.
+When they are not set, the values from the configuration file are used.
+
+- `HOST`: Overrides `server.web_socket.host`.
+- `PORT`: Overrides `server.web_socket.port`.
 
 ## server (Server Settings)
 
@@ -116,14 +126,19 @@ The total number of roles should match the sum of all the keys.
 - `enable`: Whether to enable custom profiles.
   Generally, it should be set to `true`.
 - `profile_encoding`: Items to be encoded in custom profiles or dynamic profiles.
+  The key is the item name in each profile, and the value is the label used when the profile is sent to the agent. Items not listed here are not sent.
 
 ### profiles (Custom Profiles for Each Agent)
 
 - `name`: The name of the agent.
 - `avatar_url`: The URL of the agent's avatar image.
+- `voice_id`: The VOICEVOX speaker ID used by the TTS broadcaster.
 - `age`: The age of the agent (optional).
 - `gender`: The gender of the agent (optional).
 - `personality`: The personality of the agent (optional).
+
+`age`, `gender`, and `personality` are examples of items corresponding to the keys of `profile_encoding`.
+Any item can be defined by adding it to `profile_encoding`.
 
 ### dynamic_profile (Dynamic Profile Settings)
 

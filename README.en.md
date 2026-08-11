@@ -11,6 +11,8 @@ For sample agents, please refer to [aiwolfdial/aiwolf-nlp-agent](https://github.
 - [Configuration File](/doc/en/config.md)
 - [Game Logic Implementation](/doc/en/logic.md)
 - [Protocol Implementation](/doc/en/protocol.md)
+- [REST API](/doc/en/api.md)
+- [Architecture](/doc/en/architecture.md)
 
 ## How to Run
 
