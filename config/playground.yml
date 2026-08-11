@@ -70,6 +70,7 @@ matching:
   game_count: 30
   output_path: ./log/match_optimizer.json
   infinite_loop: false
+  abort_weight_factor: 0.0
 
 custom_profile:
   enable: true
@@ -332,11 +333,9 @@ team_health:
   weight_floor: 0.1
   quarantine_rate: 0.5
   quarantine_duration: 30m
-  abort_weight_factor: 0.0
 
 slack_notifier:
   enable: false
-  webhook_url: ""
   username: aiwolf-nlp-server
   icon_emoji: ":wolf:"
   timeout: 10s

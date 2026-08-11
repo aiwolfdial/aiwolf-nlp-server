@@ -127,15 +127,16 @@ func (m *GameManager) TryStartGame(conn model.Connection) {
 				m.matchOptimizer.PenalizeMatch(game.GetRoleTeamNamesMap())
 			}
 		}
-		m.recordOutcome(game.GetID(), game.AbortedByError())
+		m.recordOutcome(game.GetID(), game.FinishReason())
 		// 終了したゲームを登録簿から取り除く。これがないとプロセス終了まで残り続ける。
 		m.games.Delete(game.GetID())
 	}()
 }
 
 // ゲームの確定結果をチームの成績へ積み、隔離や異常終了を通知する。
-// winSide が T_NONE でも max_day 到達なら異常終了ではないため、abortedByError で区別する。
-func (m *GameManager) recordOutcome(id string, abortedByError bool) {
+// 引き分けも winSide は T_NONE になるため、責任を問える打ち切りだけを異常終了として扱う。
+func (m *GameManager) recordOutcome(id string, reason model.FinishReason) {
+	abortedByError := reason == model.F_ERROR
 	var outcome teamhealth.GameOutcome
 	if m.obs.TeamHealth != nil {
 		outcome = m.obs.TeamHealth.FinishGame(id, abortedByError)

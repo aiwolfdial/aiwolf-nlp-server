@@ -8,6 +8,8 @@ When running a released binary, `./.env` is loaded; when running directly from t
 
 - `SECRET_KEY`: The secret key used for token verification when `server.authentication.enable` is set to `true` in the configuration file.
 - `OPENAI_API_KEY`: The API key for ChatGPT used when `custom_profile.dynamic_profile.enable` is set to `true` in the configuration file.
+- `SLACK_WEBHOOK_URL`: The Incoming Webhook URL to notify when `slack_notifier.enable` is set to `true` in the configuration file.
+  Since it is a secret, it cannot be placed in the configuration file and is specified only here.
 
 ### Overriding the Configuration
 
@@ -120,6 +122,9 @@ The total number of roles should match the sum of all the keys.
 - `output_path`: The output file path for the match history. (Only applies when `is_optimize` is `true`).
 - `infinite_loop`: Whether to add more games after all combinations of matching have been completed. (Only applies when `is_optimize` is `true`).
   Generally, it should be set to `false`.
+- `abort_weight_factor`: The factor multiplied into the weight of a match cut short by repeated errors. (Only applies when `is_optimize` is `true`).
+  With `0.0`, an aborted match drops to the bottom in one step. With a value greater than 0 such as `0.5`, it decays gradually with each failure.\
+  This governs the match-level weight, so it applies independently of whether `team_health` is enabled.
 
 ## custom_profile (Custom Profile Settings)
 
@@ -238,22 +243,21 @@ Because match-level and team-level failures are expressed on the same weight, th
 - `quarantine_rate`: The failure rate threshold at which quarantine begins.
 - `quarantine_duration`: How long after quarantining until it is lifted automatically.
   Further failures while quarantined do not extend the deadline. Extending it would let failures beget failures with no way back, so the team is always released once and re-evaluated on its recent record.\
-  If failures remain within the window after release, the result of the next game quarantines it again.
-  Matches containing a quarantined team are removed from the matchmaking candidates and the team returns automatically once the period expires.\
+  If failures remain within the window after release, the result of the next game quarantines it again.\
+  Matches containing a quarantined team are removed from the matchmaking candidates.\
   However, if no candidate would remain, the quarantine is ignored to avoid making games impossible to form.
 
 > [!IMPORTANT]
 > Quarantine only has an effect when `matching.team_count` is greater than `game.agent_count`.\
 > When the two are equal, every generated match uses all teams, so quarantining any team wipes out the candidates and the quarantine is always ignored.\
 > Even then, the weight-based drop in priority and the visibility through the API and Slack still work.
-- `abort_weight_factor`: The factor multiplied into the `weight` of an aborted match itself.
-  With `0.0`, an aborted match drops to the bottom in one step. With a value greater than 0 such as `0.5`, it decays gradually with each failure.
 
 ## slack_notifier (Slack Notification Settings)
 
 > [!NOTE]
 > Sends events that an operator needs to notice to a Slack Incoming Webhook.\
-> Sending is done by a dedicated goroutine, so delays or outages on the Slack side never stall the game.
+> Sending is done by a dedicated goroutine, so delays or outages on the Slack side never stall the game.\
+> Since the webhook URL is a secret, it is never placed in the config file and is read only from the `SLACK_WEBHOOK_URL` environment variable. If it is unset, a warning is logged and notifications are disabled.
 
 Notifications are built with Block Kit and distinguish severity by a color bar (green = progress, yellow = quarantine and stall, red = abort, blue = startup and shutdown).\
 Progress and failure rates are shown as bars. The bars are wrapped in inline code so the columns stay aligned.
@@ -265,8 +269,6 @@ Progress and failure rates are shown as bars. The bars are wrapped in inline cod
 ```
 
 - `enable`: Whether to enable Slack notifications.
-- `webhook_url`: The Incoming Webhook URL.
-  If empty, the `SLACK_WEBHOOK_URL` environment variable is used. Since the URL is a secret, using the environment variable rather than writing it directly in the config file is recommended.
 - `username`: The display name used for notifications.
 - `icon_emoji`: The icon used for notifications.
 - `timeout`: The timeout for sending to the webhook.

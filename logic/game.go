@@ -14,7 +14,7 @@ type Game struct {
 	id                string
 	agents            []*model.Agent
 	winSide           model.Team
-	abortedByError    bool
+	finishReason      model.FinishReason
 	isFinished        atomic.Bool
 	ruleset           model.RulesetView
 	setting           model.SettingView
@@ -113,6 +113,7 @@ func (g *Game) Start() model.Team {
 		slog.Info("日付が進みました", "id", g.id, "day", g.currentDay)
 		if g.ruleset.MaxDay() >= 0 && g.currentDay >= g.ruleset.MaxDay()+1 {
 			slog.Info("最大日数に達したため、ゲームを終了します", "id", g.id, "day", g.currentDay)
+			g.finishReason = model.F_MAX_DAY
 			break
 		}
 		if g.shouldFinish() {
@@ -133,12 +134,13 @@ func (g *Game) Start() model.Team {
 func (g *Game) shouldFinish() bool {
 	if util.CalcHasErrorAgents(g.agents) >= int(float64(len(g.agents))*g.ruleset.MaxContinueErrorRatio()) {
 		slog.Warn("エラーが多発したため、ゲームを終了します", "id", g.id)
-		g.abortedByError = true
+		g.finishReason = model.F_ERROR
 		return true
 	}
 	g.winSide = util.CalcWinSideTeam(g.getCurrentGameStatus().StatusMap)
 	if g.winSide != model.T_NONE {
 		slog.Info("勝利チームが決定したため、ゲームを終了します", "id", g.id)
+		g.finishReason = model.F_WIN
 		return true
 	}
 	return false

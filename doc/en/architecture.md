@@ -149,7 +149,7 @@ The following can be specified in `.env` or in the process environment.
 | --- | --- |
 | `SECRET_KEY` | The secret key for token verification when `server.authentication.enable` is `true` |
 | `OPENAI_API_KEY` | The ChatGPT API key used when `custom_profile.dynamic_profile.enable` is `true` |
-| `SLACK_WEBHOOK_URL` | The Slack Incoming Webhook URL used when `slack_notifier.webhook_url` is empty |
+| `SLACK_WEBHOOK_URL` | The Slack Incoming Webhook URL used when `slack_notifier.enable` is `true` |
 | `HOST` | Overrides `server.web_socket.host` |
 | `PORT` | Overrides `server.web_socket.port` |
 

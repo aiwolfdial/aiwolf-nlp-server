@@ -39,16 +39,14 @@ type SlackNotifier struct {
 }
 
 // 有効かつ Webhook URL を解決できたときだけ実体を返す。URL が無いのは設定漏れなので警告する。
+// URL は秘匿情報なので設定ファイルからは受け取らず、環境変数だけを見る。
 func NewSlackNotifier(config model.SlackNotifierConfig) *SlackNotifier {
 	if !config.Enable {
 		return nil
 	}
-	webhook := config.WebhookURL
+	webhook := os.Getenv("SLACK_WEBHOOK_URL")
 	if webhook == "" {
-		webhook = os.Getenv("SLACK_WEBHOOK_URL")
-	}
-	if webhook == "" {
-		slog.Warn("Slack通知が有効ですが、webhook_url も環境変数 SLACK_WEBHOOK_URL も設定されていません")
+		slog.Warn("Slack通知が有効ですが、環境変数 SLACK_WEBHOOK_URL が設定されていません")
 		return nil
 	}
 	if config.Timeout <= 0 {

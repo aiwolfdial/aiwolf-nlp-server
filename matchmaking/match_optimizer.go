@@ -115,7 +115,7 @@ func NewMatchOptimizer(config model.Config) (*MatchOptimizer, error) {
 		return nil, err
 	}
 	mo.store = st
-	mo.abortWeightFactor = config.TeamHealth.AbortWeightFactor
+	mo.abortWeightFactor = config.Matching.AbortWeightFactor
 	mo.save()
 	return &mo, nil
 }
@@ -128,7 +128,7 @@ func NewMatchOptimizerFromConfig(config model.Config) (*MatchOptimizer, error) {
 	}
 	mo := &MatchOptimizer{
 		store:             store.NewFileMatchOptimizerStore(config.Matching.OutputPath),
-		abortWeightFactor: config.TeamHealth.AbortWeightFactor,
+		abortWeightFactor: config.Matching.AbortWeightFactor,
 		InfiniteLoop:      config.Matching.InfiniteLoop,
 		TeamCount:         config.Matching.TeamCount,
 		GameCount:         config.Matching.GameCount,

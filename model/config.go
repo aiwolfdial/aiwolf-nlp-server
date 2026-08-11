@@ -92,6 +92,9 @@ type MatchingConfig struct {
 	GameCount    int    `yaml:"game_count"`
 	OutputPath   string `yaml:"output_path"`
 	InfiniteLoop bool   `yaml:"infinite_loop"`
+	// 異常終了したマッチ自身の重みに掛ける係数。対戦表の組み立て方の設定なので、
+	// チームの健全性 (team_health) とは独立して効く。
+	AbortWeightFactor float64 `yaml:"abort_weight_factor"`
 }
 
 type CustomProfileConfig struct {
@@ -152,7 +155,8 @@ type TTSBroadcasterConfig struct {
 	SplitArgs      []string      `yaml:"split_args"`
 }
 
-// チームごとの失敗率を直近 Window 試合で評価し、マッチの重みと隔離に反映するための設定。
+// チームごとの失敗率を直近 Window 試合で評価し、チーム単位の重みと隔離を決める設定。
+// マッチ自身の重みをどう扱うかは matching の責務なのでここには置かない。
 type TeamHealthConfig struct {
 	Enable   bool `yaml:"enable"`
 	Window   int  `yaml:"window"`
@@ -166,13 +170,11 @@ type TeamHealthConfig struct {
 	WeightFloor        float64       `yaml:"weight_floor"`
 	QuarantineRate     float64       `yaml:"quarantine_rate"`
 	QuarantineDuration time.Duration `yaml:"quarantine_duration"`
-	AbortWeightFactor  float64       `yaml:"abort_weight_factor"`
 }
 
+// Webhook URL は秘匿情報なので設定ファイルには置かず、環境変数 SLACK_WEBHOOK_URL からのみ読む。
 type SlackNotifierConfig struct {
-	Enable bool `yaml:"enable"`
-	// 空のときは環境変数 SLACK_WEBHOOK_URL を使う。URLは秘匿情報なので設定ファイルへ直接書かない運用を想定する。
-	WebhookURL     string        `yaml:"webhook_url"`
+	Enable         bool          `yaml:"enable"`
 	Username       string        `yaml:"username"`
 	IconEmoji      string        `yaml:"icon_emoji"`
 	Timeout        time.Duration `yaml:"timeout"`

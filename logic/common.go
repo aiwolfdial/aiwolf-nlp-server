@@ -226,8 +226,7 @@ func (g *Game) IsFinished() bool {
 	return g.isFinished.Load()
 }
 
-// エラー多発で打ち切られたかどうか。max_day 到達でも winSide は T_NONE になるため、
-// 参加チームの責任を問える異常終了だけを区別するために使う。
-func (g *Game) AbortedByError() bool {
-	return g.abortedByError
+// ゲームが終了した理由。winSide だけでは引き分けとエラーによる打ち切りを区別できない。
+func (g *Game) FinishReason() model.FinishReason {
+	return g.finishReason
 }

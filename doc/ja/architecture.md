@@ -149,7 +149,7 @@ observer や REST API へ渡す値は、内部状態へ到達できない読み�
 | --- | --- |
 | `SECRET_KEY` | `server.authentication.enable` が `true` の場合のトークン検証の秘密鍵 |
 | `OPENAI_API_KEY` | `custom_profile.dynamic_profile.enable` が `true` の場合の ChatGPT の API キー |
-| `SLACK_WEBHOOK_URL` | `slack_notifier.webhook_url` が空の場合の Slack Incoming Webhook の URL |
+| `SLACK_WEBHOOK_URL` | `slack_notifier.enable` が `true` の場合の Slack Incoming Webhook の URL |
 | `HOST` | `server.web_socket.host` の上書き |
 | `PORT` | `server.web_socket.port` の上書き |
 
