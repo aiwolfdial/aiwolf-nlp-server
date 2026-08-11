@@ -226,29 +226,29 @@ The structure that contains the game settings.
 - max_day (int | None): Maximum number of days in the game. If no limit, set to None.
 - role_num_map (dict[[Role](#role), int]): A map showing the number of each role.
 - vote_visibility (bool): Whether to reveal the results of the votes.
-- talk.max.count.per_agent (int): Maximum number of speeches per agent per day.
-- talk.max.count.per_day (int): Maximum number of speeches for all agents per day.
-- talk.max.length.count_in_word (bool | None): Whether to count by word count. If not set, it is None.
+- talk.max_count.per_agent (int): Maximum number of speeches per agent per day.
+- talk.max_count.per_day (int): Maximum number of speeches for all agents per day.
+- talk.max_length.count_in_word (bool | None): Whether to count by word count. If not set, it is None.
 - talk.max_length.count_spaces (bool | None): Whether to include spaces when counting characters. None if not set.
-- talk.max.length.per_talk (int | None): Maximum number of characters per talk. If no limit, set to None.
-- talk.max.length.mention_length (int | None): Additional character count when mentioning another agent in a talk. If no limit, set to None.
-- talk.max.length.per_agent (int | None): Maximum number of characters per agent per day. If no limit, set to None.
-- talk.max.length.base_length (int | None): Minimum number of characters not included in the daily character limit per agent. If no limit, set to None.
-- talk.duration (int | None): Total time limit for the group chat phase (in seconds). None if not set.
-- talk.max.skip (int): Maximum number of skips per agent per day.
-- whisper.max.count.per_agent (int): Maximum number of whispers per agent per day.
-- whisper.max.count.per_day (int): Maximum number of whispers for all agents per day.
-- whisper.max.length.count_in_word (bool | None): Whether to count by word count. If not set, it is None.
+- talk.max_length.per_talk (int | None): Maximum number of characters per talk. If no limit, set to None.
+- talk.max_length.mention_length (int | None): Additional character count when mentioning another agent in a talk. If no limit, set to None.
+- talk.max_length.per_agent (int | None): Maximum number of characters per agent per day. If no limit, set to None.
+- talk.max_length.base_length (int | None): Minimum number of characters not included in the daily character limit per agent. If no limit, set to None.
+- talk.duration (int | None): Total time limit for the group chat phase (in milliseconds). None if not set.
+- talk.max_skip (int): Maximum number of skips per agent per day.
+- whisper.max_count.per_agent (int): Maximum number of whispers per agent per day.
+- whisper.max_count.per_day (int): Maximum number of whispers for all agents per day.
+- whisper.max_length.count_in_word (bool | None): Whether to count by word count. If not set, it is None.
 - whisper.max_length.count_spaces (bool | None): Whether to include spaces when counting characters. None if not set.
-- whisper.max.length.per_talk (int | None): Maximum number of characters per whisper. If no limit, set to None.
-- whisper.max.length.mention_length (int | None): Additional character count when mentioning another agent in a whisper. If no limit, set to None.
-- whisper.max.length.per_agent (int | None): Maximum number of characters per agent per day in whispers. If no limit, set to None.
-- whisper.max.length.base_length (int | None): Minimum number of characters not included in the daily whisper character limit per agent. If no limit, set to None.
-- whisper.duration (int | None): Total time limit for the group chat phase (in seconds). None if not set.
-- whisper.max.skip (int): Maximum number of skips per agent per day in whispers.
-- vote.max.count (int): Maximum number of re-votes allowed in case of a tie for first place.
+- whisper.max_length.per_talk (int | None): Maximum number of characters per whisper. If no limit, set to None.
+- whisper.max_length.mention_length (int | None): Additional character count when mentioning another agent in a whisper. If no limit, set to None.
+- whisper.max_length.per_agent (int | None): Maximum number of characters per agent per day in whispers. If no limit, set to None.
+- whisper.max_length.base_length (int | None): Minimum number of characters not included in the daily whisper character limit per agent. If no limit, set to None.
+- whisper.duration (int | None): Total time limit for the group chat phase (in milliseconds). None if not set.
+- whisper.max_skip (int): Maximum number of skips per agent per day in whispers.
+- vote.max_count (int): Maximum number of re-votes allowed in case of a tie for first place.
 - vote.allow_self_vote (bool): Whether self-voting is allowed.
-- attack_vote.max.count (int): Maximum number of re-votes allowed for attacks in case of a tie for first place.
+- attack_vote.max_count (int): Maximum number of re-votes allowed for attacks in case of a tie for first place.
 - attack_vote.allow_self_vote (bool): Whether self-voting is allowed for attacks.
 - attack_vote.allow_no_target (bool): Whether to allow a day with no target for an attack.
 - timeout.action (int): Timeout duration for agent actions (in milliseconds).

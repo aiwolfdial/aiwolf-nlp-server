@@ -234,7 +234,7 @@
 - talk.max_length.mention_length (int | None): 1回のトークあたりのメンションを含む場合の追加文字数. per_talk の制限がない場合は None.
 - talk.max_length.per_agent (int | None): 1日あたりの1エージェントの最大文字数. 制限がない場合は None.
 - talk.max_length.base_length (int | None): 1日あたりの1エージェントの最大文字数に含まない最低文字数. 制限がない場合は None.
-- talk.duration (int | None): グループチャット方式のフェーズ全体の制限時間 (秒). 設定されていない場合は None.
+- talk.duration (int | None): グループチャット方式のフェーズ全体の制限時間 (ミリ秒). 設定されていない場合は None.
 - talk.max_skip (int): 1日あたりの1エージェントの最大スキップ回数.
 - whisper.max_count.per_agent (int): 1日あたりの1エージェントの最大囁き回数.
 - whisper.max_count.per_day (int): 1日あたりの全体の囁き回数.
@@ -244,7 +244,7 @@
 - whisper.max_length.mention_length (int | None): 1回のトークあたりのメンションを含む場合の追加文字数. per_talk の制限がない場合は None.
 - whisper.max_length.per_agent (int | None): 1日あたりの1エージェントの最大文字数. 制限がない場合は None.
 - whisper.max_length.base_length (int | None): 1日あたりの1エージェントの最大文字数に含まない最低文字数. 制限がない場合は None.
-- whisper.duration (int | None): グループチャット方式のフェーズ全体の制限時間 (秒). 設定されていない場合は None.
+- whisper.duration (int | None): グループチャット方式のフェーズ全体の制限時間 (ミリ秒). 設定されていない場合は None.
 - whisper.max_skip (int): 1日あたりの1エージェントの最大スキップ回数.
 - vote.max_count (int): 1位タイの場合の最大再投票回数.
 - vote.allow_self_vote (bool): 自己投票を許可するか.
