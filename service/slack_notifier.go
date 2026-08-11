@@ -29,13 +29,16 @@ const slackQueueSize = 64
 // Slack の Incoming Webhook へ運用イベントを送る。送信はワーカ goroutine に任せ、
 // 呼び出し側（ゲームの進行やマッチング）を Slack の遅延で止めない。
 type SlackNotifier struct {
-	config   model.SlackNotifierConfig
-	webhook  string
-	events   map[string]bool
-	client   *http.Client
-	queue    chan slackPayload
-	done     chan struct{}
-	closeOne sync.Once
+	config  model.SlackNotifierConfig
+	webhook string
+	events  map[string]bool
+	client  *http.Client
+	queue   chan slackPayload
+	done    chan struct{}
+	// closed はキューを閉じた後の送信を防ぐ。シャットダウン中も watchdog などが
+	// 通知しうるため、閉じたチャネルへ送って panic するのを避ける。
+	mu     sync.RWMutex
+	closed bool
 }
 
 // 有効かつ Webhook URL を解決できたときだけ実体を返す。URL が無いのは設定漏れなので警告する。
@@ -106,6 +109,12 @@ func (n *SlackNotifier) enqueue(event string, summary string, color string, bloc
 		Text:        summary,
 		Attachments: []slackAttachment{{Color: color, Blocks: blocks}},
 	}
+	// 送信中は Close がチャネルを閉じられないよう読み取りロックで抑える。
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	if n.closed {
+		return
+	}
 	select {
 	case n.queue <- payload:
 	default:
@@ -138,7 +147,14 @@ func (n *SlackNotifier) Close() {
 	if n == nil {
 		return
 	}
-	n.closeOne.Do(func() { close(n.queue) })
+	n.mu.Lock()
+	if n.closed {
+		n.mu.Unlock()
+		return
+	}
+	n.closed = true
+	close(n.queue)
+	n.mu.Unlock()
 	select {
 	case <-n.done:
 	case <-time.After(n.config.Timeout + n.config.MinInterval):
@@ -158,7 +174,7 @@ func (n *SlackNotifier) NotifyTeamQuarantined(snapshots []teamhealth.Snapshot) {
 	for _, s := range shown {
 		blocks = append(blocks, sectionBlock(fmt.Sprintf(
 			"*`%s`*\n%s  失敗率 *%.0f%%*  ・  マッチの重み *%.2f*",
-			s.Team, progressBar(s.FailureRate, 12), s.FailureRate*100, s.Weight)))
+			escapeSlack(s.Team), progressBar(s.FailureRate, 12), s.FailureRate*100, s.Weight)))
 		detail := fmt.Sprintf("直近 %d 試合  ・  脱落 %d  ・  異常終了 %d  ・  応答エラー %d 件",
 			s.Games, s.FatalGames, s.AbortedGames, s.RequestErrors)
 		if s.QuarantinedUntil != nil {
@@ -174,7 +190,8 @@ func (n *SlackNotifier) NotifyTeamQuarantined(snapshots []teamhealth.Snapshot) {
 	for _, s := range snapshots {
 		names = append(names, s.Team)
 	}
-	n.enqueue(EventQuarantine, "チームを隔離しました: "+strings.Join(names, ", "), colorWarning, blocks...)
+	// フォールバック文言もプッシュ通知としてSlackが解釈するため同様にエスケープする。
+	n.enqueue(EventQuarantine, "チームを隔離しました: "+strings.Join(escapeSlackAll(names), ", "), colorWarning, blocks...)
 }
 
 func (n *SlackNotifier) NotifyGameAborted(gameID string, teams []string, fatalTeams []string) {
@@ -182,36 +199,39 @@ func (n *SlackNotifier) NotifyGameAborted(gameID string, teams []string, fatalTe
 		return
 	}
 	blocks := []slackBlock{sectionBlock(":x: *ゲームが異常終了しました*")}
+	escapedFatal := escapeSlackAll(fatalTeams)
 	dropped := "(特定できず)"
-	if len(fatalTeams) > 0 {
-		dropped = "*" + strings.Join(fatalTeams, "*, *") + "*"
+	if len(escapedFatal) > 0 {
+		dropped = "*" + strings.Join(escapedFatal, "*, *") + "*"
 	}
-	blocks = append(blocks, fieldsBlock("*ゲームID*\n`"+gameID+"`", "*脱落したチーム*\n"+dropped))
+	blocks = append(blocks, fieldsBlock("*ゲームID*\n`"+escapeSlack(gameID)+"`", "*脱落したチーム*\n"+dropped))
 	if len(teams) > 0 {
-		blocks = append(blocks, contextBlock(fmt.Sprintf("参加 %d チーム: %s", len(teams), strings.Join(teams, ", "))))
+		blocks = append(blocks, contextBlock(fmt.Sprintf("参加 %d チーム: %s", len(teams), teamList(teams))))
 	}
 	summary := "ゲームが異常終了しました"
-	if len(fatalTeams) > 0 {
-		summary += " (脱落: " + strings.Join(fatalTeams, ", ") + ")"
+	if len(escapedFatal) > 0 {
+		summary += " (脱落: " + strings.Join(escapedFatal, ", ") + ")"
 	}
 	n.enqueue(EventAbort, summary, colorDanger, blocks...)
 }
 
 // NotifyMatchmakingStalled は接続済みのチームと、対戦表に載っているのに接続していない
 // チームを並べる。マッチが組めない原因は後者にあるため、両方を分けて出す。
-func (n *SlackNotifier) NotifyMatchmakingStalled(idle time.Duration, connected []string, awaiting []string) {
+func (n *SlackNotifier) NotifyMatchmakingStalled(idle time.Duration, active int, connected []string, awaiting []string) {
 	if n == nil {
 		return
 	}
 	blocks := []slackBlock{
-		sectionBlock(fmt.Sprintf(":hourglass: *マッチが %s 成立していません*", idle.Round(time.Second))),
+		sectionBlock(fmt.Sprintf(":hourglass: *新しいマッチが %s 成立していません*", idle.Round(time.Second))),
 		fieldsBlock(
 			fmt.Sprintf(":large_green_circle: *接続中* (%d)\n%s", len(connected), teamList(connected)),
 			fmt.Sprintf(":white_circle: *接続待ち* (%d)\n%s", len(awaiting), teamList(awaiting)),
 		),
+		// 進行中の試合数で「全体が止まっている」のか「一部が待たされている」のか区別できる。
+		contextBlock(fmt.Sprintf("実行中 %d 試合", active)),
 	}
-	summary := fmt.Sprintf("マッチが %s 成立していません (接続中 %d / 接続待ち %d)",
-		idle.Round(time.Second), len(connected), len(awaiting))
+	summary := fmt.Sprintf("新しいマッチが %s 成立していません (接続中 %d / 接続待ち %d / 実行中 %d)",
+		idle.Round(time.Second), len(connected), len(awaiting), active)
 	n.enqueue(EventStall, summary, colorWarning, blocks...)
 }
 

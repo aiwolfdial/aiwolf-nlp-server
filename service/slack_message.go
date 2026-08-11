@@ -80,17 +80,36 @@ func progressBar(ratio float64, cells int) string {
 // 1フィールドあたりの上限は2000文字。チーム数が多くても本文が壊れないよう頭から切る。
 const maxTeamsInField = 20
 
+// Slack のメンション記法・リンク記法として解釈される文字を潰す。
+var slackEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+
+// チーム名はクライアントが名乗った文字列そのままで、サーバは検証していない。
+// `<!channel>` を名乗られると通知のたびにチャンネル全員が呼ばれてしまうため、
+// 外部由来の文字列は本文へ入れる直前に必ずここを通す。
+func escapeSlack(s string) string {
+	return slackEscaper.Replace(s)
+}
+
+func escapeSlackAll(values []string) []string {
+	escaped := make([]string, 0, len(values))
+	for _, v := range values {
+		escaped = append(escaped, escapeSlack(v))
+	}
+	return escaped
+}
+
 // チーム名を1行に並べる。空のときに欄が消えると「0件」なのか「取れていない」のか
 // 区別できないため、必ず何か書く。
 func teamList(teams []string) string {
 	if len(teams) == 0 {
 		return "_なし_"
 	}
-	if len(teams) <= maxTeamsInField {
-		return strings.Join(teams, ", ")
+	escaped := escapeSlackAll(teams)
+	if len(escaped) <= maxTeamsInField {
+		return strings.Join(escaped, ", ")
 	}
-	return strings.Join(teams[:maxTeamsInField], ", ") +
-		fmt.Sprintf(" ほか %d チーム", len(teams)-maxTeamsInField)
+	return strings.Join(escaped[:maxTeamsInField], ", ") +
+		fmt.Sprintf(" ほか %d チーム", len(escaped)-maxTeamsInField)
 }
 
 func ratioOf(done, total int) float64 {

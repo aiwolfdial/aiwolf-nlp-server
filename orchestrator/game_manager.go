@@ -19,8 +19,17 @@ import (
 type Notifier interface {
 	NotifyGameAborted(gameID string, teams []string, fatalTeams []string)
 	NotifyTeamQuarantined(snapshots []teamhealth.Snapshot)
-	NotifyMatchmakingStalled(idle time.Duration, connected []string, awaiting []string)
+	NotifyMatchmakingStalled(idle time.Duration, active int, connected []string, awaiting []string)
 	NotifyProgress(done int, total int, active int)
+}
+
+// GameManager が待機部屋に求める操作。matchmaking.WaitingRoom が実装する。
+// 実体は接続に実 WebSocket を要求するため、マッチングまわりの判断をテストできるよう挟む。
+type WaitingRoom interface {
+	AddConnection(team string, connection model.Connection)
+	Teams() []string
+	GetConnections() ([]model.Connection, error)
+	GetConnectionsWithMatchOptimizer(matches []map[model.Role][]string) (map[model.Role][]model.Connection, error)
 }
 
 // 監視まわりの差し込み。すべて任意で、未設定なら従来どおりの挙動になる。
@@ -37,7 +46,7 @@ type Observability struct {
 type GameManager struct {
 	config          model.Config
 	gameSetting     *model.Setting
-	waitingRoom     *matchmaking.WaitingRoom
+	waitingRoom     WaitingRoom
 	matchOptimizer  *matchmaking.MatchOptimizer
 	observerFactory func() observer.GameObserver
 	games           sync.Map
@@ -66,7 +75,7 @@ func (e *gameEntry) snapshot() model.GameSnapshot {
 	}
 }
 
-func NewGameManager(config model.Config, gameSetting *model.Setting, waitingRoom *matchmaking.WaitingRoom, matchOptimizer *matchmaking.MatchOptimizer, observerFactory func() observer.GameObserver) *GameManager {
+func NewGameManager(config model.Config, gameSetting *model.Setting, waitingRoom WaitingRoom, matchOptimizer *matchmaking.MatchOptimizer, observerFactory func() observer.GameObserver) *GameManager {
 	m := &GameManager{
 		config:          config,
 		gameSetting:     gameSetting,
@@ -163,7 +172,10 @@ func (m *GameManager) notifyMilestone() {
 	}
 	done, total := m.matchOptimizer.Progress()
 	m.milestoneMu.Lock()
-	if done <= m.lastMilestone || done%m.obs.MilestoneEvery != 0 {
+	// 節目をまたいだかどうかで判定する。剰余で見ると、同時終了で消化数が節目を
+	// 飛び越えたときにその節目の通知が丸ごと消える。
+	if done <= m.lastMilestone ||
+		done/m.obs.MilestoneEvery == m.lastMilestone/m.obs.MilestoneEvery {
 		m.milestoneMu.Unlock()
 		return
 	}
@@ -188,8 +200,7 @@ func (m *GameManager) StartWatchdog() {
 }
 
 func (m *GameManager) checkStall(threshold time.Duration) {
-	// シャットダウン中や対戦中は「組めていない」ではないので対象外。
-	if m.IsShuttingDown() || m.ActiveCount() > 0 || m.stallNotified.Load() {
+	if m.IsShuttingDown() || m.stallNotified.Load() {
 		return
 	}
 	idle := time.Since(time.Unix(m.lastMatchUnix.Load(), 0))
@@ -197,10 +208,17 @@ func (m *GameManager) checkStall(threshold time.Duration) {
 		return
 	}
 	connected, awaiting := m.waitingTeams()
+	// 待機しているチームが1つも無ければ、誰も繋いでいないだけで停滞ではない。
+	// 逆に進行中のゲームがあっても、待たされているチームがいるなら停滞として扱う。
+	// 大会中はほぼ常に何かが走っているため、対戦中を除外すると永遠に発火しない。
+	if len(connected) == 0 {
+		return
+	}
+	active := m.ActiveCount()
 	slog.Warn("マッチが成立していません", "idle", idle.String(),
-		"connected", len(connected), "awaiting", len(awaiting))
+		"active", active, "connected", len(connected), "awaiting", len(awaiting))
 	m.stallNotified.Store(true)
-	m.obs.Notifier.NotifyMatchmakingStalled(idle, connected, awaiting)
+	m.obs.Notifier.NotifyMatchmakingStalled(idle, active, connected, awaiting)
 }
 
 // 待機部屋にいるチームと、対戦表に載っているのに接続していないチームに分ける。

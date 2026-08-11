@@ -4,6 +4,7 @@
 package teamhealth
 
 import (
+	"log/slog"
 	"sort"
 	"sync"
 	"time"
@@ -97,6 +98,45 @@ func withDefaults(c model.TeamHealthConfig) model.TeamHealthConfig {
 		c.QuarantineDuration = 30 * time.Minute
 	}
 	return c
+}
+
+// チーム名はクライアントが名乗った文字列で、サーバは検証していない。名前を変えながら
+// 対戦を成立させ続けられると記録が際限なく増えるため、実運用のチーム数からかけ離れた
+// 上限を置く。到達したら最終参加が古いものから捨てる。
+const maxTrackedTeams = 1000
+
+// 上限ちょうどまでしか削らないと以降は毎ゲーム破棄が走りログが埋まるため、
+// ここまでまとめて落として次の破棄まで間隔を空ける。
+const trackedTeamsLowWater = maxTrackedTeams * 9 / 10
+
+func (t *Tracker) evictLocked() {
+	if len(t.teams) <= maxTrackedTeams {
+		return
+	}
+	now := t.now()
+	type aged struct {
+		team string
+		seen time.Time
+	}
+	// 隔離中と対戦中のチームは判定に使うため残す。
+	candidates := make([]aged, 0, len(t.teams))
+	for team, st := range t.teams {
+		if st.activeGames > 0 || st.quarantinedUntil.After(now) {
+			continue
+		}
+		candidates = append(candidates, aged{team: team, seen: st.lastSeen})
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].seen.Before(candidates[j].seen) })
+	dropped := 0
+	for _, c := range candidates {
+		if len(t.teams) <= trackedTeamsLowWater {
+			break
+		}
+		delete(t.teams, c.team)
+		dropped++
+	}
+	slog.Warn("チーム記録が上限に達したため古いものを破棄しました",
+		"dropped", dropped, "teams", len(t.teams))
 }
 
 func (t *Tracker) state(team string) *teamState {
@@ -210,6 +250,7 @@ func (t *Tracker) FinishGame(id string, abortedByError bool) GameOutcome {
 		st.quarantineCount++
 		outcome.Quarantined = append(outcome.Quarantined, t.snapshot(team, st, now))
 	}
+	t.evictLocked()
 	// map の走査順は不定なので、通知やログの出力が毎回ぶれないよう並べておく。
 	sort.Strings(outcome.Teams)
 	sort.Strings(outcome.FatalTeams)

@@ -53,6 +53,28 @@ func TestTeamListTruncatesLongLists(t *testing.T) {
 	}
 }
 
+// チーム名はクライアントが名乗った文字列なので、Slack のメンション記法を通してはいけない。
+// `<!channel>` を名乗られると通知のたびにチャンネル全員が呼ばれる。
+func TestEscapeSlackNeutralizesMentions(t *testing.T) {
+	for _, raw := range []string{"<!channel>", "<!here>", "<http://evil|click>", "a&b"} {
+		got := escapeSlack(raw)
+		if strings.ContainsAny(got, "<>") {
+			t.Fatalf("%q がエスケープされていません: %q", raw, got)
+		}
+	}
+	if got := escapeSlack("a&b"); got != "a&amp;b" {
+		t.Fatalf("アンパサンドのエスケープが想定と異なります: %q", got)
+	}
+}
+
+// 一覧に並べる経路でもエスケープが漏れないこと。
+func TestTeamListEscapes(t *testing.T) {
+	got := teamList([]string{"<!channel>", "normal"})
+	if strings.ContainsAny(got, "<>") {
+		t.Fatalf("一覧でエスケープが漏れています: %q", got)
+	}
+}
+
 func TestRatioOfHandlesZeroTotal(t *testing.T) {
 	if got := ratioOf(3, 0); got != 0 {
 		t.Fatalf("総数0のとき比率が %v になりました", got)

@@ -2,6 +2,7 @@ package teamhealth
 
 import (
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -203,6 +204,48 @@ func TestSelfMatchCountsGameOnce(t *testing.T) {
 	snap, _ := tracker.Get("alpha")
 	if snap.Games != 1 {
 		t.Fatalf("1ゲームが複数件として記録されています: %v", snap.Games)
+	}
+}
+
+// チーム名はクライアントが名乗った文字列なので、名前を変え続けられると記録が
+// 際限なく増える。上限を超えたら最終参加が古いものから捨てること。
+func TestTrackedTeamsAreBounded(t *testing.T) {
+	tracker, now := newFixed(t, model.TeamHealthConfig{
+		MinGames:           1,
+		QuarantineRate:     0.1,
+		QuarantineDuration: time.Hour,
+	})
+
+	// 隔離中のチームは判定に使うため、捨てられずに残ること。
+	tracker.OnGameStart("q", agents("quarantined"), model.GameState{})
+	tracker.OnAgentFatal("q", model.AgentView{TeamName: "quarantined"}, errors.New("切断"))
+	tracker.FinishGame("q", true)
+	if !tracker.IsQuarantined("quarantined") {
+		t.Fatal("前提となる隔離が発生していません")
+	}
+
+	for i := range maxTrackedTeams + 200 {
+		*now = now.Add(time.Second)
+		id := "g" + strconv.Itoa(i)
+		team := "team" + strconv.Itoa(i)
+		tracker.OnGameStart(id, agents(team), model.GameState{})
+		tracker.FinishGame(id, false)
+	}
+
+	if got := len(tracker.Snapshots()); got > maxTrackedTeams {
+		t.Fatalf("チーム記録が上限を超えています: %v", got)
+	}
+	if _, ok := tracker.Get("quarantined"); !ok {
+		t.Fatal("隔離中のチームが捨てられました")
+	}
+	// 最後に参加したチームは残っていること。
+	last := "team" + strconv.Itoa(maxTrackedTeams+199)
+	if _, ok := tracker.Get(last); !ok {
+		t.Fatalf("直近のチームが捨てられました: %s", last)
+	}
+	// 最初のほうのチームは捨てられていること。
+	if _, ok := tracker.Get("team0"); ok {
+		t.Fatal("最も古いチームが捨てられていません")
 	}
 }
 

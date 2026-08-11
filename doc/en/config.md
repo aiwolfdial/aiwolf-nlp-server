@@ -248,9 +248,11 @@ Because match-level and team-level failures are expressed on the same weight, th
   However, if no candidate would remain, the quarantine is ignored to avoid making games impossible to form.
 
 > [!IMPORTANT]
-> Quarantine only has an effect when `matching.team_count` is greater than `game.agent_count`.\
-> When the two are equal, every generated match uses all teams, so quarantining any team wipes out the candidates and the quarantine is always ignored.\
-> Even then, the weight-based drop in priority and the visibility through the API and Slack still work.
+> Team-level evaluation affects the match order only when `matching.team_count` is greater than `game.agent_count`.\
+> When the two are equal, every generated match uses all teams in one seat each, so two things happen at once.\
+> - Quarantining any team wipes out the candidates, so the quarantine is always ignored.\
+> - The product of the team weights is the same value for every match, so the order is decided by each match's own `weight` alone.\
+> In this configuration, only the match-level drop in priority from `matching.abort_weight_factor` and the visibility through the API and Slack still work.
 
 ## slack_notifier (Slack Notification Settings)
 
@@ -279,8 +281,9 @@ Progress and failure rates are shown as bars. The bars are wrapped in inline cod
   - `abort`: When a game is cut short due to repeated errors.
   - `stall`: When no match has been formed for a certain period.
   - `milestone`: Server startup and shutdown, plus progress every so many games.
-- `stall_threshold`: Notify when no match has been formed for this long.
-  Only evaluated when there are no games in progress. If 0, stall monitoring is disabled.\
+- `stall_threshold`: Notify when no new match has been formed for this long.
+  Only evaluated when teams are present in the waiting room. If 0, stall monitoring is disabled.\
+  It notifies even while games are in progress, as long as some team is being kept waiting. During a contest something is almost always running, so excluding in-progress games would mean it almost never fires.\
   The notification separates the teams present in the waiting room ("connected") from those listed in the schedule but not connected ("awaiting").\
   The latter is where the reason a match cannot form lies, but since the roster comes from the schedule, only the connected teams can be shown when `matching.is_optimize` is `false`.
 - `milestone_every`: How many games between progress notifications.
