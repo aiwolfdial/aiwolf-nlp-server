@@ -41,6 +41,8 @@ When they are not set, the values from the configuration file are used.
 - `acceptable`: Grace period on the server side.
 
 - `max_continue_error_ratio`: The maximum ratio of error agents that can continue in the game.
+  The number of agents at which a game is cut short is `int(agent_count x this value)`, but a value that truncates to 0 is rounded up to 1.\
+  With 0, a game would be cut short even though no agent has dropped out (this applies below 0.2 for a 5-player game and below 0.077 for a 13-player game).
 
 ## game (Game Settings)
 

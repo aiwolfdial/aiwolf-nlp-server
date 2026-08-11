@@ -132,7 +132,7 @@ func (g *Game) Start() model.Team {
 }
 
 func (g *Game) shouldFinish() bool {
-	if util.CalcHasErrorAgents(g.agents) >= int(float64(len(g.agents))*g.ruleset.MaxContinueErrorRatio()) {
+	if util.CalcHasErrorAgents(g.agents) >= util.CalcErrorAbortThreshold(len(g.agents), g.ruleset.MaxContinueErrorRatio()) {
 		slog.Warn("エラーが多発したため、ゲームを終了します", "id", g.id)
 		g.finishReason = model.F_ERROR
 		return true
